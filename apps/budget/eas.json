@@ -12,13 +12,13 @@
       "distribution": "internal",
       "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-RAILWAY-URL"
+        "EXPO_PUBLIC_API_URL": "https://okes-production.up.railway.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-RAILWAY-URL"
+        "EXPO_PUBLIC_API_URL": "https://okes-production.up.railway.app"
       }
     }
   },
