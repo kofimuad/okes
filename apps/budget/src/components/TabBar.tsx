@@ -39,7 +39,10 @@ export function OkesTabBar({ state, navigation, insets }: OkesTabBarProps) {
           tint={mode === "dark" ? "dark" : "light"}
           style={[StyleSheet.absoluteFill, styles.behind]}
         />
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.behind, { backgroundColor: colors.surfaceGlassStrong }]} />
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, styles.behind, { backgroundColor: mode === "dark" ? "#14161EF2" : "#F7F8FAF2" }]}
+        />
         {state.routes.map((route, index) => {
           const meta = META[route.name];
           if (!meta) return null;
