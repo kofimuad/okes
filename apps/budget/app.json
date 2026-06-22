@@ -39,7 +39,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-dev-client",
       "./plugins/withSmsPermissions"
     ],
     "experiments": {
