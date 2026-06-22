@@ -15,6 +15,13 @@
       "when": 1782131811071,
       "tag": "0001_conscious_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782157666915,
+      "tag": "0002_volatile_silhouette",
+      "breakpoints": true
     }
   ]
 }

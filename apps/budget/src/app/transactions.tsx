@@ -3,12 +3,13 @@ import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GlassCard } from "../components/GlassCard";
 import { Icon, Pill } from "../components/primitives";
 import { ScreenBackground } from "../components/ScreenBackground";
 import { api } from "../lib/api";
+import { scanSms, smsSupported } from "../lib/sms";
 import { useTheme } from "../theme";
 
 type Filter = "all" | "in" | "out";
@@ -37,10 +38,28 @@ export default function TransactionsScreen() {
   const summaryQ = useQuery({ queryKey: ["summary"], queryFn: () => api.summary() });
   const monthIn = summaryQ.data?.month.incomeMinor ?? 0;
   const monthOut = summaryQ.data?.month.spendMinor ?? 0;
+  const walletsQ = useQuery({ queryKey: ["wallets"], queryFn: () => api.listWallets() });
   const confirm = useMutation({
     mutationFn: (id: string) => api.updateTransaction(id, { needsReview: false }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
   });
+
+  const [scanning, setScanning] = useState(false);
+  const scan = async () => {
+    setScanning(true);
+    try {
+      const byProvider: Record<string, string | undefined> = {};
+      for (const w of walletsQ.data?.wallets ?? []) if (!byProvider[w.provider]) byProvider[w.provider] = w.id;
+      const items = await scanSms(byProvider);
+      const res = await api.importTransactions(items);
+      for (const k of ["transactions", "summary", "wallets", "caps"]) qc.invalidateQueries({ queryKey: [k] });
+      Alert.alert("SMS scan complete", `${res.imported} captured, ${res.skipped} already recorded.`);
+    } catch (e) {
+      Alert.alert("Couldn't scan SMS", e instanceof Error ? e.message : "Try again.");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const all = q.data?.transactions ?? [];
   const reviewCount = all.filter((t) => t.needsReview).length;
@@ -69,6 +88,23 @@ export default function TransactionsScreen() {
               <Icon name="tune" size={20} color={colors.textSecondary} />
             </View>
           </View>
+
+          {smsSupported() && (
+            <Pressable
+              onPress={scan}
+              disabled={scanning}
+              style={[styles.scanBtn, { backgroundColor: colors.tintTealStrong, borderColor: colors.hairlineBright }]}
+            >
+              {scanning ? (
+                <ActivityIndicator color={colors.accentCyan} />
+              ) : (
+                <Icon name="sms" size={18} color={colors.accentCyan} />
+              )}
+              <Text style={[styles.scanText, { color: colors.accentCyan }]}>
+                {scanning ? "Scanning…" : "Scan SMS for transactions"}
+              </Text>
+            </Pressable>
+          )}
 
           {reviewCount > 0 && (
             <GlassCard tint={colors.tintTeal} style={styles.review}>
@@ -193,6 +229,8 @@ const styles = StyleSheet.create({
   review: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   reviewIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   reviewTitle: { fontFamily: fonts.semibold, fontSize: 14 },
+  scanBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", paddingVertical: 13, borderRadius: radius.pill, borderWidth: 1 },
+  scanText: { fontFamily: fonts.semibold, fontSize: 13 },
   reviewBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill },
   reviewBtnText: { fontFamily: fonts.bold, fontSize: 13 },
   muted: { fontFamily: fonts.body, fontSize: 12 },

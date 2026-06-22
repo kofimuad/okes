@@ -188,6 +188,7 @@ export type {
   CategoryDto,
   CrewDto,
   GoalDto,
+  ImportTxItem,
   NewCrewInput,
   NewGoalInput,
   NewTransactionInput,
@@ -198,3 +199,6 @@ export type {
   TransactionDto,
   WalletDto,
 } from "./api";
+
+export { parseSms, providerLabel } from "./sms";
+export type { ParsedSms, SmsProvider } from "./sms";

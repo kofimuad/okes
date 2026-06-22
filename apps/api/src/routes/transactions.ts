@@ -1,5 +1,5 @@
 import { transactions, wallets } from "@okes/db";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db } from "../db";
@@ -23,6 +23,22 @@ const createBody = z.object({
   auto: z.boolean().default(false),
   needsReview: z.boolean().default(false),
 });
+const importBody = z.object({
+  items: z
+    .array(
+      z.object({
+        externalRef: z.string().min(1).max(160),
+        walletId: z.uuid(),
+        direction: z.enum(["in", "out"]),
+        amountMinor: amountMinorField,
+        currency: currencyField,
+        party: z.string().min(1).max(160),
+        occurredAt: z.coerce.date().optional(),
+      }),
+    )
+    .max(200),
+});
+
 const updateBody = z
   .object({
     direction: z.enum(["in", "out"]),
@@ -92,6 +108,58 @@ export async function transactionRoutes(app: FastifyInstance) {
       return created;
     });
     return reply.code(201).send({ transaction: row });
+  });
+
+  // Bulk import of auto-captured (e.g. SMS-parsed) transactions; dedupes by externalRef.
+  app.post("/transactions/import", auth, async (req, reply) => {
+    const body = parseOr400(reply, importBody, req.body);
+    if (!body) return;
+    if (body.items.length === 0) return { imported: 0, skipped: 0 };
+
+    const result = await db.transaction(async (tx) => {
+      const owned = new Set(
+        (await tx.select({ id: wallets.id }).from(wallets).where(eq(wallets.userId, req.user.sub))).map((w) => w.id),
+      );
+      const refs = body.items.map((i) => i.externalRef);
+      const existing = new Set(
+        (
+          await tx
+            .select({ ref: transactions.externalRef })
+            .from(transactions)
+            .where(and(eq(transactions.userId, req.user.sub), inArray(transactions.externalRef, refs)))
+        ).map((r) => r.ref),
+      );
+
+      let imported = 0;
+      let skipped = 0;
+      for (const it of body.items) {
+        if (existing.has(it.externalRef) || !owned.has(it.walletId)) {
+          skipped++;
+          continue;
+        }
+        await tx.insert(transactions).values({
+          userId: req.user.sub,
+          walletId: it.walletId,
+          direction: it.direction,
+          amountMinor: it.amountMinor,
+          currency: it.currency,
+          party: it.party,
+          occurredAt: it.occurredAt ?? new Date(),
+          auto: true,
+          needsReview: true,
+          externalRef: it.externalRef,
+        });
+        await tx
+          .update(wallets)
+          .set({ balanceMinor: sql`${wallets.balanceMinor} + ${signed(it.direction, it.amountMinor)}` })
+          .where(eq(wallets.id, it.walletId));
+        existing.add(it.externalRef);
+        imported++;
+      }
+      return { imported, skipped };
+    });
+
+    return reply.code(201).send(result);
   });
 
   app.patch<{ Params: { id: string } }>("/transactions/:id", auth, async (req, reply) => {

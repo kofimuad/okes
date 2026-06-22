@@ -117,6 +117,16 @@ export interface NewGoalInput {
   currency?: string;
   deadline?: string;
 }
+export interface ImportTxItem {
+  externalRef: string;
+  walletId: string;
+  direction: "in" | "out";
+  amountMinor: number;
+  currency?: string;
+  party: string;
+  occurredAt?: string;
+}
+
 export interface NewCrewInput {
   name: string;
   initial: string;
@@ -162,6 +172,7 @@ export interface ApiClient {
   ): Promise<{ transaction: TransactionDto }>;
   createGoal(input: NewGoalInput): Promise<{ goal: GoalDto }>;
   contributeGoal(id: string, amountMinor: number): Promise<{ goal: GoalDto }>;
+  importTransactions(items: ImportTxItem[]): Promise<{ imported: number; skipped: number }>;
   createCrewMember(input: NewCrewInput): Promise<{ member: CrewDto }>;
   decideApproval(id: string, status: "approved" | "declined"): Promise<{ approval: ApprovalDto }>;
 }
@@ -261,6 +272,8 @@ export function createApiClient(baseUrl: string): ApiClient {
       request<{ goal: GoalDto }>("/goals", { method: "POST", body: input }),
     contributeGoal: (id, amountMinor) =>
       request<{ goal: GoalDto }>(`/goals/${id}/contribute`, { method: "POST", body: { amountMinor } }),
+    importTransactions: (items) =>
+      request<{ imported: number; skipped: number }>("/transactions/import", { method: "POST", body: { items } }),
     createCrewMember: (input) =>
       request<{ member: CrewDto }>("/crew", { method: "POST", body: input }),
     decideApproval: (id, status) =>

@@ -97,6 +97,8 @@ export const transactions = pgTable("transactions", {
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   auto: boolean("auto").notNull().default(false),
   needsReview: boolean("needs_review").notNull().default(false),
+  /** Provider/SMS reference, used to dedupe auto-captured transactions. */
+  externalRef: varchar("external_ref", { length: 160 }),
   createdAt: createdAt(),
 });
 

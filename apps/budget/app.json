@@ -39,7 +39,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-dev-client"
+      "expo-dev-client",
+      "./plugins/withSmsPermissions"
     ],
     "experiments": {
       "typedRoutes": true,
