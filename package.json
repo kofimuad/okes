@@ -17,6 +17,7 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
+    "sharp": "^0.35.2",
     "turbo": "^2",
     "typescript": "~6.0.3"
   }
