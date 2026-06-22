@@ -1,0 +1,23 @@
+{
+  "name": "okes",
+  "private": true,
+  "packageManager": "pnpm@11.8.0",
+  "scripts": {
+    "budget": "pnpm --filter @okes/budget",
+    "start": "pnpm --filter @okes/budget start",
+    "api:dev": "pnpm --filter @okes/api dev",
+    "db:generate": "pnpm --filter @okes/db generate",
+    "db:migrate": "pnpm --filter @okes/db migrate",
+    "db:push": "pnpm --filter @okes/db push",
+    "db:seed": "pnpm --filter @okes/api run seed",
+    "db:studio": "pnpm --filter @okes/db studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "typescript": "~6.0.3"
+  }
+}

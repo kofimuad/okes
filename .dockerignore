@@ -1,0 +1,10 @@
+**/node_modules
+**/.turbo
+**/dist
+**/.expo
+**/web-build
+**/.git
+**/*.log
+**/.env
+**/.env.local
+design
