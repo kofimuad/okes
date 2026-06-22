@@ -6,3 +6,6 @@ packages:
 allowBuilds:
   argon2: true
   esbuild: true
+
+patchedDependencies:
+  react-native-get-sms-android: patches/react-native-get-sms-android.patch
