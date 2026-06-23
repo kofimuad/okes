@@ -71,4 +71,17 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user) return reply.code(404).send({ error: "User not found" });
     return reply.send({ user: publicUser(user) });
   });
+
+  app.post("/auth/change-password", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const parsed = z
+      .object({ currentPassword: z.string().min(1), newPassword: z.string().min(8, "Password must be at least 8 characters") })
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: z.treeifyError(parsed.error) });
+    const [user] = await db.select().from(users).where(eq(users.id, req.user.sub)).limit(1);
+    if (!user) return reply.code(404).send({ error: "User not found" });
+    if (!(await verifyPassword(user.passwordHash, parsed.data.currentPassword)))
+      return reply.code(401).send({ error: "Current password is incorrect" });
+    await db.update(users).set({ passwordHash: await hashPassword(parsed.data.newPassword) }).where(eq(users.id, user.id));
+    return reply.send({ ok: true });
+  });
 }

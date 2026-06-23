@@ -169,6 +169,7 @@ export interface ApiClient {
   login(email: string, password: string): Promise<AuthResult>;
   refresh(): Promise<{ accessToken: string; refreshToken: string }>;
   me(): Promise<{ user: PublicUser }>;
+  changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true }>;
   summary(): Promise<SummaryDto>;
   listWallets(): Promise<{ wallets: WalletDto[]; totalMinor: number }>;
   listTransactions(params?: {
@@ -277,6 +278,8 @@ export function createApiClient(baseUrl: string): ApiClient {
       return r;
     },
     me: () => request<{ user: PublicUser }>("/auth/me"),
+    changePassword: (currentPassword, newPassword) =>
+      request<{ ok: true }>("/auth/change-password", { method: "POST", body: { currentPassword, newPassword } }),
     summary: () => request<SummaryDto>("/summary"),
     listWallets: () =>
       request<{ wallets: WalletDto[]; totalMinor: number }>("/wallets"),

@@ -1,5 +1,6 @@
 import { fonts, radius } from "@okes/ui";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter, type Href } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
@@ -9,16 +10,18 @@ import { ScreenBackground } from "../../components/ScreenBackground";
 import { api } from "../../lib/api";
 import { useTheme } from "../../theme";
 
-const SETTINGS = [
-  { icon: "notifications", label: "Notifications" },
-  { icon: "security", label: "Privacy & security" },
-  { icon: "account-balance-wallet", label: "Linked wallets" },
-  { icon: "payments", label: "Currency" },
-  { icon: "help", label: "Help & support" },
-] as const;
+const SETTINGS: { icon: string; label: string; route: Href }[] = [
+  { icon: "notifications", label: "Notifications", route: "/settings/notifications" },
+  { icon: "security", label: "Privacy & security", route: "/settings/security" },
+  { icon: "category", label: "Categories", route: "/categories" },
+  { icon: "account-balance-wallet", label: "Linked wallets", route: "/wallets" },
+  { icon: "payments", label: "Currency", route: "/settings/currency" },
+  { icon: "help", label: "Help & support", route: "/settings/help" },
+];
 
 export default function ProfileScreen() {
   const { colors, mode, toggle } = useTheme();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const q = useQuery({ queryKey: ["profile"], queryFn: () => api.getProfile() });
   const p = q.data?.profile;
@@ -31,9 +34,9 @@ export default function ProfileScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           <View style={styles.topBar}>
             <Text style={[styles.title, { color: colors.textPrimary, flex: 1 }]}>Profile</Text>
-            <View style={[styles.gear, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+            <Pressable onPress={() => router.push("/settings/notifications")} style={[styles.gear, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
               <Icon name="settings" size={21} color={colors.textSecondary} />
-            </View>
+            </Pressable>
           </View>
 
           <GlassCard bright style={{ gap: 16 }}>
@@ -95,7 +98,7 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             {SETTINGS.map((s) => (
-              <Pressable key={s.label} style={styles.settingRow}>
+              <Pressable key={s.label} style={styles.settingRow} onPress={() => router.push(s.route)}>
                 <View style={[styles.settingIcon, { backgroundColor: colors.surfaceGlassStrong }]}>
                   <Icon name={s.icon as never} size={19} color={colors.textSecondary} />
                 </View>

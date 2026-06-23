@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { KenteRow, ProgressRing } from "../../components/Decor";
@@ -77,6 +77,21 @@ export default function CommandCenter() {
     },
   });
 
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [fromW, setFromW] = useState<string | null>(null);
+  const [toW, setToW] = useState<string | null>(null);
+  const [xferAmt, setXferAmt] = useState("");
+  const fromWallet = fromW ?? wallets[0]?.id ?? null;
+  const toWallet = toW ?? wallets.find((w) => w.id !== fromWallet)?.id ?? null;
+  const doTransfer = useMutation({
+    mutationFn: () => api.transfer({ fromWalletId: fromWallet!, toWalletId: toWallet!, amountMinor: toMinor(xferAmt) }),
+    onSuccess: () => {
+      for (const k of ["wallets", "summary", "transactions"]) qc.invalidateQueries({ queryKey: [k] });
+      setTransferOpen(false); setXferAmt("");
+    },
+    onError: (e) => Alert.alert("Transfer failed", e instanceof Error ? e.message : "Try again."),
+  });
+
   const firstName = user?.name?.split(" ")[0] ?? "Captain";
   const balanceMinor = summaryQ.data?.balanceMinor ?? 0;
   const major = Math.floor(balanceMinor / 100).toLocaleString("en-GH");
@@ -108,13 +123,13 @@ export default function CommandCenter() {
               <Text style={[styles.greeting, { color: colors.textPrimary }]}>Good morning, {firstName}</Text>
             </View>
             <View style={styles.headerActions}>
-              <View style={[styles.circleBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+              <Pressable style={[styles.circleBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]} onPress={() => router.push("/alerts")}>
                 <Icon name="notifications" size={22} color={colors.textPrimary} />
                 <View style={[styles.dot, { backgroundColor: colors.accentPink, borderColor: colors.bgDeep }]} />
-              </View>
-              <View style={[styles.circleBtn, { backgroundColor: colors.tintViolet, borderColor: colors.hairlineBright }]}>
+              </Pressable>
+              <Pressable style={[styles.circleBtn, { backgroundColor: colors.tintViolet, borderColor: colors.hairlineBright }]} onPress={() => router.push("/coach")}>
                 <Icon name="smart-toy" size={22} color={colors.accentCyan} />
-              </View>
+              </Pressable>
             </View>
           </View>
 
@@ -151,7 +166,16 @@ export default function CommandCenter() {
           {/* Quick actions */}
           <View style={styles.quickRow}>
             {QUICK.map((q) => (
-              <Pressable key={q.label} style={styles.quickItem} onPress={() => { if (q.label === "Add") setAddOpen(true); else if (q.route) router.push(q.route); }}>
+              <Pressable
+                key={q.label}
+                style={styles.quickItem}
+                onPress={() => {
+                  if (q.label === "Add") setAddOpen(true);
+                  else if (q.label === "Send") setTransferOpen(true);
+                  else if (q.label === "Scan") Alert.alert("Coming soon", "Receipt scanning is on the way.");
+                  else if (q.route) router.push(q.route);
+                }}
+              >
                 <View style={[styles.quickCircle, { backgroundColor: tint[q.key], borderColor: colors.hairline }]}>
                   <Icon name={q.icon as never} size={24} color={accent[q.key]} />
                 </View>
@@ -288,6 +312,27 @@ export default function CommandCenter() {
               busy={addTx.isPending}
               disabled={!activeWallet || toMinor(amount) <= 0}
               onPress={() => activeWallet && addTx.mutate({ walletId: activeWallet, direction, party: party.trim() || "Transaction", amountMinor: toMinor(amount) })}
+            />
+          </>
+        )}
+      </Sheet>
+
+      <Sheet visible={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer between wallets">
+        {wallets.length < 2 ? (
+          <View style={{ gap: 12, alignItems: "center", paddingVertical: 8 }}>
+            <Icon name="account-balance-wallet" size={28} color={colors.textMuted} />
+            <Text style={[styles.muted, { color: colors.textSecondary }]}>You need at least two wallets to transfer.</Text>
+          </View>
+        ) : (
+          <>
+            <ChipSelect label="FROM" value={fromWallet ?? ""} options={wallets.map((w) => ({ value: w.id, label: w.label }))} onChange={setFromW} />
+            <ChipSelect label="TO" value={toWallet ?? ""} options={wallets.filter((w) => w.id !== fromWallet).map((w) => ({ value: w.id, label: w.label }))} onChange={setToW} />
+            <Field label="AMOUNT (GHS)" value={xferAmt} onChangeText={setXferAmt} placeholder="0.00" keyboardType="decimal-pad" />
+            <SheetButton
+              label="Transfer"
+              busy={doTransfer.isPending}
+              disabled={!fromWallet || !toWallet || fromWallet === toWallet || toMinor(xferAmt) <= 0}
+              onPress={() => doTransfer.mutate()}
             />
           </>
         )}

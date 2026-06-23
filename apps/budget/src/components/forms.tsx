@@ -16,6 +16,7 @@ export function Field({
   placeholder,
   keyboardType,
   autoCapitalize,
+  secureTextEntry,
 }: {
   label: string;
   value: string;
@@ -23,6 +24,7 @@ export function Field({
   placeholder?: string;
   keyboardType?: "default" | "numeric" | "decimal-pad";
   autoCapitalize?: "none" | "sentences" | "words";
+  secureTextEntry?: boolean;
 }) {
   const { colors } = useTheme();
   return (
@@ -35,6 +37,7 @@ export function Field({
         placeholderTextColor={colors.textMuted}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
+        secureTextEntry={secureTextEntry}
         style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceGlassStrong, borderColor: colors.hairline }]}
       />
     </View>

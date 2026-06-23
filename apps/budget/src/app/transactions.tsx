@@ -3,7 +3,7 @@ import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChipSelect, Field, SheetButton, toMinor } from "../components/forms";
 import { GlassCard } from "../components/GlassCard";
@@ -40,6 +40,11 @@ export default function TransactionsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fWallet, setFWallet] = useState("");
+  const [fCategory, setFCategory] = useState("");
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["transactions", "all"], queryFn: () => api.listTransactions({ limit: 100 }) });
   const summaryQ = useQuery({ queryKey: ["summary"], queryFn: () => api.summary() });
@@ -112,7 +117,15 @@ export default function TransactionsScreen() {
 
   const all = q.data?.transactions ?? [];
   const reviewCount = all.filter((t) => t.needsReview).length;
-  const shown = filter === "all" ? all : all.filter((t) => t.direction === filter);
+  const search = searchText.trim().toLowerCase();
+  const shown = all.filter(
+    (t) =>
+      (filter === "all" || t.direction === filter) &&
+      (!fWallet || t.walletId === fWallet) &&
+      (!fCategory || t.categoryId === fCategory) &&
+      (!search || t.party.toLowerCase().includes(search)),
+  );
+  const filtersActive = Boolean(fWallet || fCategory);
 
   const groups: { label: string; items: TransactionDto[] }[] = [];
   for (const t of shown) {
@@ -130,13 +143,32 @@ export default function TransactionsScreen() {
               <Icon name="chevron-left" size={24} color={colors.textPrimary} />
             </Pressable>
             <Text style={[styles.title, { color: colors.textPrimary, flex: 1 }]}>Transactions</Text>
-            <View style={[styles.iconBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
-              <Icon name="search" size={21} color={colors.textSecondary} />
-            </View>
-            <View style={[styles.iconBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
-              <Icon name="tune" size={20} color={colors.textSecondary} />
-            </View>
+            <Pressable onPress={() => setShowSearch((s) => !s)} style={[styles.iconBtn, { backgroundColor: showSearch ? colors.tintTealStrong : colors.surfaceGlass, borderColor: showSearch ? colors.hairlineBright : colors.hairline }]}>
+              <Icon name="search" size={21} color={showSearch ? colors.accentCyan : colors.textSecondary} />
+            </Pressable>
+            <Pressable onPress={() => setFilterOpen(true)} style={[styles.iconBtn, { backgroundColor: filtersActive ? colors.tintTealStrong : colors.surfaceGlass, borderColor: filtersActive ? colors.hairlineBright : colors.hairline }]}>
+              <Icon name="tune" size={20} color={filtersActive ? colors.accentCyan : colors.textSecondary} />
+            </Pressable>
           </View>
+
+          {showSearch && (
+            <View style={[styles.searchBar, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+              <Icon name="search" size={18} color={colors.textMuted} />
+              <TextInput
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Search transactions"
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+                style={[styles.searchInput, { color: colors.textPrimary }]}
+              />
+              {searchText.length > 0 && (
+                <Pressable onPress={() => setSearchText("")} hitSlop={8}>
+                  <Icon name="close" size={18} color={colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {smsSupported() && (
             <Pressable
@@ -248,6 +280,27 @@ export default function TransactionsScreen() {
           <Text style={[styles.deleteText, { color: colors.accentPink }]}>Delete transaction</Text>
         </Pressable>
       </Sheet>
+
+      <Sheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filter transactions">
+        <ChipSelect
+          label="WALLET"
+          value={fWallet}
+          options={[{ value: "", label: "All" }, ...(walletsQ.data?.wallets ?? []).map((w) => ({ value: w.id, label: w.label }))]}
+          onChange={setFWallet}
+        />
+        <ChipSelect
+          label="CATEGORY"
+          value={fCategory}
+          options={[{ value: "", label: "All" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+          onChange={setFCategory}
+        />
+        <SheetButton label="Apply" onPress={() => setFilterOpen(false)} />
+        {filtersActive && (
+          <Pressable style={styles.deleteBtn} onPress={() => { setFWallet(""); setFCategory(""); }}>
+            <Text style={[styles.deleteText, { color: colors.textSecondary }]}>Clear filters</Text>
+          </Pressable>
+        )}
+      </Sheet>
     </ScreenBackground>
   );
 }
@@ -319,4 +372,6 @@ const styles = StyleSheet.create({
   autoText: { fontFamily: fonts.semibold, fontSize: 10 },
   deleteBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
   deleteText: { fontFamily: fonts.semibold, fontSize: 14 },
+  searchBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, height: 46, borderRadius: radius.pill, borderWidth: 1 },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, paddingVertical: 0 },
 });
