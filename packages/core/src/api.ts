@@ -99,6 +99,13 @@ export interface MissionDto {
   claimed: boolean;
 }
 
+export interface NotifPrefs {
+  push: boolean;
+  caps: boolean;
+  summary: boolean;
+  crew: boolean;
+}
+
 export interface NewWalletInput {
   provider: WalletDto["provider"];
   label: string;
@@ -195,6 +202,9 @@ export interface ApiClient {
   getProfile(): Promise<{ profile: ProfileDto }>;
   listMissions(): Promise<{ missions: MissionDto[] }>;
   claimMission(key: string): Promise<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>;
+  registerDevice(token: string, platform?: string): Promise<{ ok: true }>;
+  getNotifPrefs(): Promise<{ prefs: NotifPrefs }>;
+  updateNotifPrefs(patch: Partial<NotifPrefs>): Promise<{ prefs: NotifPrefs }>;
   // writes
   createWallet(input: NewWalletInput): Promise<{ wallet: WalletDto }>;
   createTransaction(input: NewTransactionInput): Promise<{ transaction: TransactionDto }>;
@@ -314,6 +324,10 @@ export function createApiClient(baseUrl: string): ApiClient {
     listMissions: () => request<{ missions: MissionDto[] }>("/missions"),
     claimMission: (key) =>
       request<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>(`/missions/${key}/claim`, { method: "POST" }),
+    registerDevice: (token, platform) =>
+      request<{ ok: true }>("/devices", { method: "POST", body: { token, platform } }),
+    getNotifPrefs: () => request<{ prefs: NotifPrefs }>("/notifications/prefs"),
+    updateNotifPrefs: (patch) => request<{ prefs: NotifPrefs }>("/notifications/prefs", { method: "PATCH", body: patch }),
     createWallet: (input) =>
       request<{ wallet: WalletDto }>("/wallets", { method: "POST", body: input }),
     createTransaction: (input) =>

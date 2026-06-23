@@ -11,6 +11,7 @@ import {
 } from "@expo-google-fonts/space-grotesk";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -35,6 +36,15 @@ function Guard({ children }: { children: ReactNode }) {
     if (status === "guest" && !inAuthFlow) router.replace("/welcome");
     if (status === "authed" && inAuthFlow) router.replace("/");
   }, [status, segments, router]);
+
+  // Tapping a push notification routes to the relevant screen.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const route = resp.notification.request.content.data?.route as string | undefined;
+      if (route) router.push(route as never);
+    });
+    return () => sub.remove();
+  }, [router]);
 
   if (status === "loading") {
     return (

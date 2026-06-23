@@ -213,6 +213,7 @@ export type {
   GoalDto,
   ImportTxItem,
   MissionDto,
+  NotifPrefs,
   NewCapInput,
   NewCategoryInput,
   NewCrewInput,

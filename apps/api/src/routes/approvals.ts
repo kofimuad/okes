@@ -2,8 +2,10 @@ import { approvals } from "@okes/db";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { formatMoney, money } from "@okes/core";
 import { db } from "../db";
 import { amountMinorField, currencyField, parseOr400 } from "../lib/http";
+import { sendPush } from "../lib/push";
 
 const createBody = z.object({
   amountMinor: amountMinorField,
@@ -32,6 +34,11 @@ export async function approvalRoutes(app: FastifyInstance) {
       .insert(approvals)
       .values({ ...body, userId: req.user.sub })
       .returning();
+    void sendPush(req.user.sub, "approvals", {
+      title: "Approval requested",
+      body: `${formatMoney(money(body.amountMinor))} · ${body.reason}`,
+      data: { route: "/crew" },
+    });
     return reply.code(201).send({ approval: row });
   });
 
@@ -44,6 +51,11 @@ export async function approvalRoutes(app: FastifyInstance) {
       .where(and(eq(approvals.id, req.params.id), eq(approvals.userId, req.user.sub)))
       .returning();
     if (!row) return reply.code(404).send({ error: "Not found" });
+    void sendPush(req.user.sub, "approvals", {
+      title: `Spend ${body.status}`,
+      body: `${formatMoney(money(row.amountMinor))} · ${row.reason}`,
+      data: { route: "/crew" },
+    });
     return { approval: row };
   });
 }

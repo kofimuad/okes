@@ -8,7 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "../lib/api";
+import { registerForPush } from "../lib/notifications";
 import { storage } from "../lib/storage";
+import { Platform } from "react-native";
 
 const ACCESS_KEY = "okes.access";
 const REFRESH_KEY = "okes.refresh";
@@ -64,6 +66,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, []);
+
+  // Once authenticated, register this device for push (best-effort).
+  useEffect(() => {
+    if (status !== "authed") return;
+    (async () => {
+      try {
+        const token = await registerForPush();
+        if (token) await api.registerDevice(token, Platform.OS);
+      } catch {
+        // ignore — notifications are non-critical
+      }
+    })();
+  }, [status]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

@@ -48,6 +48,22 @@ export const users = pgTable("users", {
   level: integer("level").notNull().default(1),
   streakDays: integer("streak_days").notNull().default(0),
   lastActiveOn: date("last_active_on"),
+  // notification preferences
+  notifyPush: boolean("notify_push").notNull().default(true),
+  notifyCaps: boolean("notify_caps").notNull().default(true),
+  notifySummary: boolean("notify_summary").notNull().default(true),
+  notifyCrew: boolean("notify_crew").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+/** Expo push tokens, one row per device. */
+export const deviceTokens = pgTable("device_tokens", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  platform: varchar("platform", { length: 16 }).notNull().default("android"),
   createdAt: createdAt(),
 });
 

@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db } from "../db";
 import { amountMinorField, currencyField, parseOr400 } from "../lib/http";
+import { notifyCapCrossing } from "../lib/push";
 
 const listQuery = z.object({
   walletId: z.uuid().optional(),
@@ -107,6 +108,7 @@ export async function transactionRoutes(app: FastifyInstance) {
         .where(eq(wallets.id, body.walletId));
       return created;
     });
+    if (body.direction === "out") void notifyCapCrossing(req.user.sub, body.categoryId ?? null, body.amountMinor);
     return reply.code(201).send({ transaction: row });
   });
 

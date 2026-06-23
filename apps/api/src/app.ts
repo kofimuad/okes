@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/auth";
 import { capRoutes } from "./routes/caps";
 import { categoryRoutes } from "./routes/categories";
 import { crewRoutes } from "./routes/crew";
+import { deviceRoutes } from "./routes/devices";
 import { goalRoutes } from "./routes/goals";
 import { incomeRoutes } from "./routes/income";
 import { missionRoutes } from "./routes/missions";
@@ -40,6 +41,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(profileRoutes);
   await app.register(missionRoutes);
+  await app.register(deviceRoutes);
   // Money
   await app.register(walletRoutes);
   await app.register(categoryRoutes);
