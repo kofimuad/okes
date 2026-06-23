@@ -5,6 +5,7 @@ import {
   pgEnum,
   pgTable,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -46,8 +47,24 @@ export const users = pgTable("users", {
   xp: integer("xp").notNull().default(0),
   level: integer("level").notNull().default(1),
   streakDays: integer("streak_days").notNull().default(0),
+  lastActiveOn: date("last_active_on"),
   createdAt: createdAt(),
 });
+
+/** One row per mission claimed per day (prevents double-claiming). */
+export const missionClaims = pgTable(
+  "mission_claims",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    missionKey: varchar("mission_key", { length: 64 }).notNull(),
+    claimedOn: date("claimed_on").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("mission_claims_unique").on(t.userId, t.missionKey, t.claimedOn)],
+);
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: id(),

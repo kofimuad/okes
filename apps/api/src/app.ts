@@ -9,6 +9,7 @@ import { categoryRoutes } from "./routes/categories";
 import { crewRoutes } from "./routes/crew";
 import { goalRoutes } from "./routes/goals";
 import { incomeRoutes } from "./routes/income";
+import { missionRoutes } from "./routes/missions";
 import { profileRoutes } from "./routes/profile";
 import { summaryRoutes } from "./routes/summary";
 import { transactionRoutes } from "./routes/transactions";
@@ -38,6 +39,7 @@ export async function buildApp() {
   // Auth & profile
   await app.register(authRoutes);
   await app.register(profileRoutes);
+  await app.register(missionRoutes);
   // Money
   await app.register(walletRoutes);
   await app.register(categoryRoutes);

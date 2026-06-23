@@ -90,6 +90,15 @@ export interface ProfileDto {
   streakDays: number;
 }
 
+export interface MissionDto {
+  key: string;
+  title: string;
+  detail: string;
+  xp: number;
+  icon: string;
+  claimed: boolean;
+}
+
 export interface NewWalletInput {
   provider: WalletDto["provider"];
   label: string;
@@ -184,6 +193,8 @@ export interface ApiClient {
   listCrew(): Promise<{ crew: CrewDto[] }>;
   listApprovals(): Promise<{ approvals: ApprovalDto[] }>;
   getProfile(): Promise<{ profile: ProfileDto }>;
+  listMissions(): Promise<{ missions: MissionDto[] }>;
+  claimMission(key: string): Promise<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>;
   // writes
   createWallet(input: NewWalletInput): Promise<{ wallet: WalletDto }>;
   createTransaction(input: NewTransactionInput): Promise<{ transaction: TransactionDto }>;
@@ -300,6 +311,9 @@ export function createApiClient(baseUrl: string): ApiClient {
     listCrew: () => request<{ crew: CrewDto[] }>("/crew"),
     listApprovals: () => request<{ approvals: ApprovalDto[] }>("/approvals"),
     getProfile: () => request<{ profile: ProfileDto }>("/profile"),
+    listMissions: () => request<{ missions: MissionDto[] }>("/missions"),
+    claimMission: (key) =>
+      request<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>(`/missions/${key}/claim`, { method: "POST" }),
     createWallet: (input) =>
       request<{ wallet: WalletDto }>("/wallets", { method: "POST", body: input }),
     createTransaction: (input) =>

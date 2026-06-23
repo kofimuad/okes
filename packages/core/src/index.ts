@@ -160,6 +160,29 @@ export interface PlayerProfile {
   streakDays: number;
 }
 
+/** XP needed to advance FROM the given level. */
+export const xpToNext = (level: number): number => level * 500;
+
+/** Add XP and roll up levels. xp is carried within the current level. */
+export function applyXp(level: number, xp: number, gained: number): { level: number; xp: number } {
+  let lvl = level;
+  let total = xp + gained;
+  while (total >= xpToNext(lvl)) {
+    total -= xpToNext(lvl);
+    lvl += 1;
+  }
+  return { level: lvl, xp: total };
+}
+
+/** Daily missions. Claimable once per calendar day for XP. */
+export const MISSIONS = [
+  { key: "log_today", title: "Log a transaction", detail: "Capture today's spending", xp: 50, icon: "edit-note" },
+  { key: "review_inbox", title: "Clear your review inbox", detail: "Confirm auto-captured items", xp: 40, icon: "inbox" },
+  { key: "add_to_goal", title: "Feed a goal", detail: "Move money toward a goal", xp: 75, icon: "savings" },
+  { key: "check_caps", title: "Check your caps", detail: "Review your spending limits", xp: 30, icon: "speed" },
+] as const;
+export type MissionKey = (typeof MISSIONS)[number]["key"];
+
 // ---------------------------------------------------------------------------
 // Backend client config
 // ---------------------------------------------------------------------------
@@ -189,6 +212,7 @@ export type {
   CrewDto,
   GoalDto,
   ImportTxItem,
+  MissionDto,
   NewCapInput,
   NewCategoryInput,
   NewCrewInput,

@@ -22,6 +22,13 @@
       "when": 1782157666915,
       "tag": "0002_volatile_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782251948262,
+      "tag": "0003_mean_boom_boom",
+      "breakpoints": true
     }
   ]
 }

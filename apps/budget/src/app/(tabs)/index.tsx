@@ -23,11 +23,6 @@ const QUICK = [
   { label: "Scan", icon: "document-scanner", key: "amber", route: null },
 ] as const;
 
-const MISSIONS = [
-  { title: "No-spend day", icon: "savings", xp: 50, progress: 0.4, key: "mint" },
-  { title: "Log all income", icon: "receipt-long", xp: 30, progress: 1, key: "cyan" },
-] as const;
-
 const DIRECTION_OPTIONS: { value: "in" | "out"; label: string }[] = [
   { value: "out", label: "Spending" },
   { value: "in", label: "Income" },
@@ -90,6 +85,18 @@ export default function CommandCenter() {
       setTransferOpen(false); setXferAmt("");
     },
     onError: (e) => Alert.alert("Transfer failed", e instanceof Error ? e.message : "Try again."),
+  });
+
+  const missionsQ = useQuery({ queryKey: ["missions"], queryFn: () => api.listMissions() });
+  const missions = missionsQ.data?.missions ?? [];
+  const claim = useMutation({
+    mutationFn: (key: string) => api.claimMission(key),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["missions"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      Alert.alert("Mission complete", `+${data.awardedXp} XP earned 🚀`);
+    },
+    onError: (e) => Alert.alert("Couldn't claim", e instanceof Error ? e.message : "Try again."),
   });
 
   const firstName = user?.name?.split(" ")[0] ?? "Captain";
@@ -195,24 +202,26 @@ export default function CommandCenter() {
                 <Text style={[styles.chipText, { color: colors.accentAmber }]}>{streak} day streak</Text>
               </Pill>
             </View>
-            <View style={styles.missionsRow}>
-              {MISSIONS.map((m) => {
-                const done = m.progress >= 1;
-                const col = m.key === "mint" ? colors.accentMint : colors.accentCyan;
-                return (
-                  <GlassCard key={m.title} style={styles.missionCard}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.missionsRow}>
+              {missions.map((m) => (
+                <Pressable key={m.key} disabled={m.claimed || claim.isPending} onPress={() => claim.mutate(m.key)}>
+                  <GlassCard style={styles.missionCard}>
                     <View style={styles.rowBetween}>
-                      <View style={[styles.missionIcon, { backgroundColor: done ? colors.tintGreen : colors.tintTeal }]}>
-                        <Icon name={m.icon as never} size={20} color={col} />
+                      <View style={[styles.missionIcon, { backgroundColor: m.claimed ? colors.tintGreen : colors.tintTeal }]}>
+                        <Icon name={(m.claimed ? "check-circle" : m.icon) as never} size={20} color={m.claimed ? colors.accentMint : colors.accentCyan} />
                       </View>
-                      <Pill bg={colors.tintViolet}><Text style={[styles.xp, { color: colors.accentViolet }]}>+{m.xp} XP</Text></Pill>
+                      <Pill bg={m.claimed ? colors.tintGreen : colors.tintViolet}>
+                        <Text style={[styles.xp, { color: m.claimed ? colors.accentMint : colors.accentViolet }]}>+{m.xp} XP</Text>
+                      </Pill>
                     </View>
                     <Text style={[styles.missionTitle, { color: colors.textPrimary }]}>{m.title}</Text>
-                    <ProgressBar value={m.progress} color={done ? colors.accentMint : col} height={6} />
+                    <Text style={[styles.missionDetail, { color: m.claimed ? colors.accentMint : colors.textMuted }]}>
+                      {m.claimed ? "Claimed today" : m.detail}
+                    </Text>
                   </GlassCard>
-                );
-              })}
-            </View>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
 
           {/* Spending caps */}
@@ -396,10 +405,11 @@ const styles = StyleSheet.create({
   quickItem: { alignItems: "center", gap: 8 },
   quickCircle: { width: 56, height: 56, borderRadius: radius.lg, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontFamily: fonts.medium, fontSize: 12 },
-  missionsRow: { flexDirection: "row", gap: 12 },
-  missionCard: { flex: 1, gap: 12, padding: 14 },
+  missionsRow: { flexDirection: "row", gap: 12, paddingRight: 4 },
+  missionCard: { width: 172, gap: 10, padding: 14 },
   missionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   missionTitle: { fontFamily: fonts.semibold, fontSize: 14 },
+  missionDetail: { fontFamily: fonts.body, fontSize: 11 },
   xp: { fontFamily: fonts.bold, fontSize: 11 },
   capMain: { flexDirection: "row", alignItems: "center", gap: 16 },
   ringPct: { fontFamily: fonts.displayBold, fontSize: 18 },
