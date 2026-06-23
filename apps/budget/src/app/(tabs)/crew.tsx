@@ -2,7 +2,7 @@ import { formatMoney, money, type CrewDto, type NewCrewInput } from "@okes/core"
 import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChipSelect, Field, SheetButton } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
@@ -46,6 +46,23 @@ export default function CrewScreen() {
     mutationFn: ({ id, status }: { id: string; status: "approved" | "declined" }) => api.decideApproval(id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["approvals"] }),
   });
+
+  const [manage, setManage] = useState<CrewDto | null>(null);
+  const [mRole, setMRole] = useState<CrewDto["role"]>("watcher");
+  const openManage = (m: CrewDto) => { setManage(m); setMRole(m.role); };
+  const updateMember = useMutation({
+    mutationFn: (m: CrewDto) => api.updateCrewMember(m.id, { role: mRole }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["crew"] }); setManage(null); },
+  });
+  const removeMember = useMutation({
+    mutationFn: (id: string) => api.deleteCrewMember(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["crew"] }); setManage(null); },
+  });
+  const confirmRemove = (m: CrewDto) =>
+    Alert.alert("Remove from crew?", m.name, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => removeMember.mutate(m.id) },
+    ]);
 
   const tint: Record<string, string> = { pink: colors.tintClay, amber: colors.tintGold, cyan: colors.tintTeal };
   const accent: Record<string, string> = { pink: colors.accentPink, amber: colors.accentAmber, cyan: colors.accentCyan };
@@ -109,7 +126,8 @@ export default function CrewScreen() {
             crew.map((m) => {
               const role = ROLES[m.role];
               return (
-                <GlassCard key={m.id} style={styles.memberRow}>
+                <Pressable key={m.id} onPress={() => openManage(m)}>
+                <GlassCard style={styles.memberRow}>
                   <View style={{ width: 46, height: 46 }}>
                     <View style={[styles.avatar, { backgroundColor: avatarCol[role.key] }]}>
                       <Text style={[styles.avatarText, { color: colors.onAccent }]}>{m.initial}</Text>
@@ -125,6 +143,7 @@ export default function CrewScreen() {
                     <Text style={[styles.roleText, { color: accent[role.key] }]}>{role.label}</Text>
                   </Pill>
                 </GlassCard>
+                </Pressable>
               );
             })
           )}
@@ -141,11 +160,22 @@ export default function CrewScreen() {
           onPress={() => invite.mutate({ name: name.trim(), initial: (name.trim()[0] || "?").toUpperCase(), role })}
         />
       </Sheet>
+
+      <Sheet visible={manage !== null} onClose={() => setManage(null)} title={manage?.name ?? "Crew member"}>
+        <ChipSelect label="ROLE" value={mRole} options={ROLE_OPTIONS} onChange={setMRole} />
+        <SheetButton label="Save role" busy={updateMember.isPending} onPress={() => manage && updateMember.mutate(manage)} />
+        <Pressable style={styles.removeBtn} onPress={() => manage && confirmRemove(manage)}>
+          <Icon name="person-remove" size={18} color={colors.accentPink} />
+          <Text style={[styles.removeText, { color: colors.accentPink }]}>Remove from crew</Text>
+        </Pressable>
+      </Sheet>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  removeBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  removeText: { fontFamily: fonts.semibold, fontSize: 14 },
   content: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 130, gap: 16 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontFamily: fonts.display, fontSize: 24, fontWeight: "600" },

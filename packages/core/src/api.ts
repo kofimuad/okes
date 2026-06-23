@@ -132,6 +132,24 @@ export interface NewCrewInput {
   initial: string;
   role: CrewDto["role"];
 }
+export interface NewCapInput {
+  categoryId: string;
+  limitMinor: number;
+  currency?: string;
+  alertThresholds?: number[];
+  lockAtLimit?: boolean;
+  notifyCrew?: boolean;
+}
+export interface NewCategoryInput {
+  name: string;
+  icon: string;
+}
+export interface TransferInput {
+  fromWalletId: string;
+  toWalletId: string;
+  amountMinor: number;
+  note?: string;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -156,6 +174,8 @@ export interface ApiClient {
   listTransactions(params?: {
     limit?: number;
     needsReview?: boolean;
+    walletId?: string;
+    direction?: "in" | "out";
   }): Promise<{ transactions: TransactionDto[] }>;
   listGoals(): Promise<{ goals: GoalDto[] }>;
   listCaps(): Promise<{ caps: CapDto[] }>;
@@ -168,12 +188,26 @@ export interface ApiClient {
   createTransaction(input: NewTransactionInput): Promise<{ transaction: TransactionDto }>;
   updateTransaction(
     id: string,
-    patch: Partial<{ categoryId: string | null; needsReview: boolean; party: string }>,
+    patch: Partial<{ categoryId: string | null; needsReview: boolean; party: string; amountMinor: number; direction: "in" | "out"; occurredAt: string }>,
   ): Promise<{ transaction: TransactionDto }>;
   createGoal(input: NewGoalInput): Promise<{ goal: GoalDto }>;
   contributeGoal(id: string, amountMinor: number): Promise<{ goal: GoalDto }>;
   importTransactions(items: ImportTxItem[]): Promise<{ imported: number; skipped: number }>;
+  updateWallet(id: string, patch: Partial<NewWalletInput>): Promise<{ wallet: WalletDto }>;
+  deleteWallet(id: string): Promise<{ ok: true }>;
+  deleteTransaction(id: string): Promise<{ ok: true }>;
+  transfer(input: TransferInput): Promise<{ ok: true }>;
+  updateGoal(id: string, patch: Partial<NewGoalInput>): Promise<{ goal: GoalDto }>;
+  deleteGoal(id: string): Promise<{ ok: true }>;
+  createCap(input: NewCapInput): Promise<{ cap: CapDto }>;
+  updateCap(id: string, patch: Partial<NewCapInput>): Promise<{ cap: CapDto }>;
+  deleteCap(id: string): Promise<{ ok: true }>;
+  createCategory(input: NewCategoryInput): Promise<{ category: CategoryDto }>;
+  updateCategory(id: string, patch: Partial<NewCategoryInput>): Promise<{ category: CategoryDto }>;
+  deleteCategory(id: string): Promise<{ ok: true }>;
   createCrewMember(input: NewCrewInput): Promise<{ member: CrewDto }>;
+  updateCrewMember(id: string, patch: { role?: CrewDto["role"]; online?: boolean }): Promise<{ member: CrewDto }>;
+  deleteCrewMember(id: string): Promise<{ ok: true }>;
   decideApproval(id: string, status: "approved" | "declined"): Promise<{ approval: ApprovalDto }>;
 }
 
@@ -249,8 +283,9 @@ export function createApiClient(baseUrl: string): ApiClient {
     listTransactions: (params) => {
       const q = new URLSearchParams();
       if (params?.limit) q.set("limit", String(params.limit));
-      if (params?.needsReview !== undefined)
-        q.set("needsReview", String(params.needsReview));
+      if (params?.needsReview !== undefined) q.set("needsReview", String(params.needsReview));
+      if (params?.walletId) q.set("walletId", params.walletId);
+      if (params?.direction) q.set("direction", params.direction);
       const qs = q.toString();
       return request<{ transactions: TransactionDto[] }>(
         `/transactions${qs ? `?${qs}` : ""}`,
@@ -274,8 +309,27 @@ export function createApiClient(baseUrl: string): ApiClient {
       request<{ goal: GoalDto }>(`/goals/${id}/contribute`, { method: "POST", body: { amountMinor } }),
     importTransactions: (items) =>
       request<{ imported: number; skipped: number }>("/transactions/import", { method: "POST", body: { items } }),
+    updateWallet: (id, patch) =>
+      request<{ wallet: WalletDto }>(`/wallets/${id}`, { method: "PATCH", body: patch }),
+    deleteWallet: (id) => request<{ ok: true }>(`/wallets/${id}`, { method: "DELETE" }),
+    deleteTransaction: (id) => request<{ ok: true }>(`/transactions/${id}`, { method: "DELETE" }),
+    transfer: (input) => request<{ ok: true }>("/transfers", { method: "POST", body: input }),
+    updateGoal: (id, patch) =>
+      request<{ goal: GoalDto }>(`/goals/${id}`, { method: "PATCH", body: patch }),
+    deleteGoal: (id) => request<{ ok: true }>(`/goals/${id}`, { method: "DELETE" }),
+    createCap: (input) => request<{ cap: CapDto }>("/caps", { method: "POST", body: input }),
+    updateCap: (id, patch) => request<{ cap: CapDto }>(`/caps/${id}`, { method: "PATCH", body: patch }),
+    deleteCap: (id) => request<{ ok: true }>(`/caps/${id}`, { method: "DELETE" }),
+    createCategory: (input) =>
+      request<{ category: CategoryDto }>("/categories", { method: "POST", body: input }),
+    updateCategory: (id, patch) =>
+      request<{ category: CategoryDto }>(`/categories/${id}`, { method: "PATCH", body: patch }),
+    deleteCategory: (id) => request<{ ok: true }>(`/categories/${id}`, { method: "DELETE" }),
     createCrewMember: (input) =>
       request<{ member: CrewDto }>("/crew", { method: "POST", body: input }),
+    updateCrewMember: (id, patch) =>
+      request<{ member: CrewDto }>(`/crew/${id}`, { method: "PATCH", body: patch }),
+    deleteCrewMember: (id) => request<{ ok: true }>(`/crew/${id}`, { method: "DELETE" }),
     decideApproval: (id, status) =>
       request<{ approval: ApprovalDto }>(`/approvals/${id}`, { method: "PATCH", body: { status } }),
   };

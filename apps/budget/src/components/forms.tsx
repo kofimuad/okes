@@ -76,6 +76,26 @@ export function ChipSelect<T extends string>({
   );
 }
 
+export function Toggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={() => onChange(!value)} style={styles.toggleRow}>
+      <Text style={[styles.toggleLabel, { color: colors.textPrimary }]}>{label}</Text>
+      <View style={[styles.track, { backgroundColor: value ? colors.accentCyan : colors.trackBg, justifyContent: value ? "flex-end" : "flex-start" }]}>
+        <View style={styles.knob} />
+      </View>
+    </Pressable>
+  );
+}
+
 export function SheetButton({
   label,
   onPress,
@@ -117,4 +137,8 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.medium, fontSize: 13 },
   button: { paddingVertical: 15, borderRadius: radius.pill, alignItems: "center", marginTop: 4 },
   buttonText: { fontFamily: fonts.bold, fontSize: 15 },
+  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
+  toggleLabel: { fontFamily: fonts.medium, fontSize: 14 },
+  track: { width: 46, height: 27, borderRadius: 100, padding: 3, flexDirection: "row", alignItems: "center" },
+  knob: { width: 21, height: 21, borderRadius: 100, backgroundColor: "#f2f4f8" },
 });

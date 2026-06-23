@@ -3,7 +3,7 @@ import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ProgressRing } from "../components/Decor";
 import { Field, SheetButton, toMinor } from "../components/forms";
@@ -48,6 +48,31 @@ export default function GoalsScreen() {
     onSuccess: () => { invalidate(); setContribFor(null); setAmount(""); },
   });
 
+  const [editGoal, setEditGoal] = useState<GoalDto | null>(null);
+  const [eName, setEName] = useState("");
+  const [eTarget, setETarget] = useState("");
+  const [eDeadline, setEDeadline] = useState("");
+  const openEdit = (g: GoalDto) => {
+    setEditGoal(g);
+    setEName(g.name);
+    setETarget((g.targetMinor / 100).toFixed(2));
+    setEDeadline(g.deadline ?? "");
+  };
+  const update = useMutation({
+    mutationFn: (g: GoalDto) =>
+      api.updateGoal(g.id, { name: eName.trim() || g.name, targetMinor: toMinor(eTarget) || g.targetMinor, deadline: eDeadline.trim() || undefined }),
+    onSuccess: () => { invalidate(); setEditGoal(null); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteGoal(id),
+    onSuccess: () => { invalidate(); setEditGoal(null); },
+  });
+  const confirmDelete = (g: GoalDto) =>
+    Alert.alert("Delete goal?", g.name, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => remove.mutate(g.id) },
+    ]);
+
   return (
     <ScreenBackground>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
@@ -87,7 +112,7 @@ export default function GoalsScreen() {
                   </Pill>
                 </View>
               </GlassCard>
-              {goals.map((g) => <GoalCard key={g.id} goal={g} onContribute={() => setContribFor(g)} />)}
+              {goals.map((g) => <GoalCard key={g.id} goal={g} onContribute={() => setContribFor(g)} onPress={() => openEdit(g)} />)}
             </>
           )}
         </ScrollView>
@@ -114,14 +139,26 @@ export default function GoalsScreen() {
           onPress={() => contribFor && contribute.mutate({ id: contribFor.id, amountMinor: toMinor(amount) })}
         />
       </Sheet>
+
+      <Sheet visible={editGoal !== null} onClose={() => setEditGoal(null)} title="Edit goal">
+        <Field label="NAME" value={eName} onChangeText={setEName} placeholder="Goal name" />
+        <Field label="TARGET AMOUNT (GHS)" value={eTarget} onChangeText={setETarget} keyboardType="decimal-pad" />
+        <Field label="TARGET DATE (optional)" value={eDeadline} onChangeText={setEDeadline} placeholder="2026-12-01" />
+        <SheetButton label="Save changes" busy={update.isPending} onPress={() => editGoal && update.mutate(editGoal)} />
+        <Pressable style={styles.deleteBtn} onPress={() => editGoal && confirmDelete(editGoal)}>
+          <Icon name="delete" size={18} color={colors.accentPink} />
+          <Text style={[styles.deleteText, { color: colors.accentPink }]}>Delete goal</Text>
+        </Pressable>
+      </Sheet>
     </ScreenBackground>
   );
 }
 
-function GoalCard({ goal, onContribute }: { goal: GoalDto; onContribute: () => void }) {
+function GoalCard({ goal, onContribute, onPress }: { goal: GoalDto; onContribute: () => void; onPress: () => void }) {
   const { colors } = useTheme();
   const ratio = goal.targetMinor > 0 ? Math.min(goal.savedMinor / goal.targetMinor, 1) : 0;
   return (
+    <Pressable onPress={onPress}>
     <GlassCard style={{ gap: 13 }}>
       <View style={styles.row}>
         <View style={[styles.icon, { backgroundColor: colors.tintGreen }]}>
@@ -147,6 +184,7 @@ function GoalCard({ goal, onContribute }: { goal: GoalDto; onContribute: () => v
         </Pressable>
       </View>
     </GlassCard>
+    </Pressable>
   );
 }
 
@@ -169,4 +207,6 @@ const styles = StyleSheet.create({
   pct: { fontFamily: fonts.displayBold, fontSize: 20, fontWeight: "700" },
   amt: { fontFamily: fonts.medium, fontSize: 13 },
   chipText: { fontFamily: fonts.semibold, fontSize: 11 },
+  deleteBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  deleteText: { fontFamily: fonts.semibold, fontSize: 14 },
 });

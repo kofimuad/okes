@@ -1,6 +1,7 @@
 import { formatMoney, money, type NewWalletInput, type WalletDto } from "@okes/core";
 import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,6 +29,7 @@ const PROVIDERS: Record<WalletDto["provider"], { label: string; icon: string; ke
 
 export default function WalletsScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["wallets"], queryFn: () => api.listWallets() });
 
@@ -94,7 +96,8 @@ export default function WalletsScreen() {
             wallets.map((w) => {
               const meta = PROVIDERS[w.provider];
               return (
-                <GlassCard key={w.id} style={{ gap: 14 }}>
+                <Pressable key={w.id} onPress={() => router.push({ pathname: "/wallet/[id]", params: { id: w.id } })}>
+                <GlassCard style={{ gap: 14 }}>
                   <View style={styles.row}>
                     <View style={[styles.logo, { backgroundColor: tint[meta.key], borderColor: colors.hairlineBright }]}>
                       <Icon name={meta.icon as never} size={24} color={accent[meta.key]} />
@@ -110,6 +113,7 @@ export default function WalletsScreen() {
                   <Text style={[styles.balance, { color: colors.textPrimary }]}>{formatMoney(money(w.balanceMinor))}</Text>
                   <Text style={[styles.masked, { color: colors.textMuted }]}>{w.maskedNumber}</Text>
                 </GlassCard>
+                </Pressable>
               );
             })
           )}

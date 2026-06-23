@@ -194,7 +194,7 @@ export default function CommandCenter() {
           {/* Spending caps */}
           {topCap && (
             <View style={{ gap: 12 }}>
-              <SectionHeader icon="speed" iconColor={colors.accentCyan} title="Spending Caps" action="Manage" onAction={() => router.push("/transactions")} />
+              <SectionHeader icon="speed" iconColor={colors.accentCyan} title="Spending Caps" action="Manage" onAction={() => router.push("/caps")} />
               <GlassCard style={{ gap: 16 }}>
                 <View style={styles.capMain}>
                   <ProgressRing size={76} strokeWidth={8} progress={ratio(topCap)} color={statusColor(topCap.status)} track={colors.trackBg}>

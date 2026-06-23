@@ -1,16 +1,23 @@
-import { formatMoney, money, type TransactionDto } from "@okes/core";
+import { formatMoney, money, type CategoryDto, type TransactionDto } from "@okes/core";
 import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ChipSelect, Field, SheetButton, toMinor } from "../components/forms";
 import { GlassCard } from "../components/GlassCard";
 import { Icon, Pill } from "../components/primitives";
 import { ScreenBackground } from "../components/ScreenBackground";
+import { Sheet } from "../components/Sheet";
 import { api } from "../lib/api";
 import { scanSms, smsSupported } from "../lib/sms";
 import { useTheme } from "../theme";
+
+const TYPE_OPTIONS: { value: "in" | "out"; label: string }[] = [
+  { value: "out", label: "Spending" },
+  { value: "in", label: "Income" },
+];
 
 type Filter = "all" | "in" | "out";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -39,10 +46,52 @@ export default function TransactionsScreen() {
   const monthIn = summaryQ.data?.month.incomeMinor ?? 0;
   const monthOut = summaryQ.data?.month.spendMinor ?? 0;
   const walletsQ = useQuery({ queryKey: ["wallets"], queryFn: () => api.listWallets() });
+  const catsQ = useQuery({ queryKey: ["categories"], queryFn: () => api.listCategories() });
+  const categories = catsQ.data?.categories ?? [];
   const confirm = useMutation({
     mutationFn: (id: string) => api.updateTransaction(id, { needsReview: false }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
   });
+
+  const invalidateAll = () => {
+    for (const k of ["transactions", "summary", "wallets", "caps"]) qc.invalidateQueries({ queryKey: [k] });
+  };
+
+  // --- edit / delete a transaction ---
+  const [editing, setEditing] = useState<TransactionDto | null>(null);
+  const [eParty, setEParty] = useState("");
+  const [eAmount, setEAmount] = useState("");
+  const [eDir, setEDir] = useState<"in" | "out">("out");
+  const [eCat, setECat] = useState("");
+
+  const openEdit = (t: TransactionDto) => {
+    setEditing(t);
+    setEParty(t.party);
+    setEAmount((t.amountMinor / 100).toFixed(2));
+    setEDir(t.direction);
+    setECat(t.categoryId ?? "");
+  };
+
+  const saveTx = useMutation({
+    mutationFn: (t: TransactionDto) =>
+      api.updateTransaction(t.id, {
+        party: eParty.trim() || t.party,
+        amountMinor: toMinor(eAmount) || t.amountMinor,
+        direction: eDir,
+        categoryId: eCat || null,
+        needsReview: false,
+      }),
+    onSuccess: () => { invalidateAll(); setEditing(null); },
+  });
+  const delTx = useMutation({
+    mutationFn: (id: string) => api.deleteTransaction(id),
+    onSuccess: () => { invalidateAll(); setEditing(null); },
+  });
+  const confirmDelete = (t: TransactionDto) =>
+    Alert.alert("Delete transaction?", `${t.party} · ${formatMoney(money(t.amountMinor))}`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => delTx.mutate(t.id) },
+    ]);
 
   const [scanning, setScanning] = useState(false);
   const scan = async () => {
@@ -175,23 +224,40 @@ export default function TransactionsScreen() {
                       {net >= 0 ? "+ " : "- "}{formatMoney(money(Math.abs(net)))}
                     </Text>
                   </View>
-                  {g.items.map((t) => <TxRow key={t.id} tx={t} onConfirm={() => confirm.mutate(t.id)} />)}
+                  {g.items.map((t) => <TxRow key={t.id} tx={t} onPress={() => openEdit(t)} onConfirm={() => confirm.mutate(t.id)} />)}
                 </View>
               );
             })
           )}
         </ScrollView>
       </SafeAreaView>
+
+      <Sheet visible={editing !== null} onClose={() => setEditing(null)} title="Edit transaction">
+        <Field label="DESCRIPTION" value={eParty} onChangeText={setEParty} placeholder="e.g. Bolt Food" />
+        <ChipSelect label="TYPE" value={eDir} options={TYPE_OPTIONS} onChange={setEDir} />
+        <Field label="AMOUNT (GHS)" value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" />
+        <ChipSelect
+          label="CATEGORY"
+          value={eCat}
+          options={[{ value: "", label: "Uncategorized" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+          onChange={setECat}
+        />
+        <SheetButton label="Save changes" busy={saveTx.isPending} onPress={() => editing && saveTx.mutate(editing)} />
+        <Pressable style={styles.deleteBtn} onPress={() => editing && confirmDelete(editing)}>
+          <Icon name="delete" size={18} color={colors.accentPink} />
+          <Text style={[styles.deleteText, { color: colors.accentPink }]}>Delete transaction</Text>
+        </Pressable>
+      </Sheet>
     </ScreenBackground>
   );
 }
 
-function TxRow({ tx, onConfirm }: { tx: TransactionDto; onConfirm?: () => void }) {
+function TxRow({ tx, onConfirm, onPress }: { tx: TransactionDto; onConfirm?: () => void; onPress?: () => void }) {
   const { colors } = useTheme();
   const incoming = tx.direction === "in";
   const time = new Date(tx.occurredAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return (
-    <View style={styles.txRow}>
+    <Pressable style={styles.txRow} onPress={onPress}>
       <View style={[styles.txIcon, { backgroundColor: incoming ? colors.tintGreen : colors.tintGold, borderColor: colors.hairline }]}>
         <Icon name={incoming ? "call-received" : "shopping-bag"} size={22} color={incoming ? colors.accentMint : colors.accentAmber} />
       </View>
@@ -217,7 +283,7 @@ function TxRow({ tx, onConfirm }: { tx: TransactionDto; onConfirm?: () => void }
           </Pill>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -251,4 +317,6 @@ const styles = StyleSheet.create({
   txName: { fontFamily: fonts.semibold, fontSize: 14 },
   txAmt: { fontFamily: fonts.displayBold, fontSize: 14 },
   autoText: { fontFamily: fonts.semibold, fontSize: 10 },
+  deleteBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  deleteText: { fontFamily: fonts.semibold, fontSize: 14 },
 });

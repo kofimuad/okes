@@ -12,6 +12,7 @@ import { incomeRoutes } from "./routes/income";
 import { profileRoutes } from "./routes/profile";
 import { summaryRoutes } from "./routes/summary";
 import { transactionRoutes } from "./routes/transactions";
+import { transferRoutes } from "./routes/transfers";
 import { walletRoutes } from "./routes/wallets";
 
 export async function buildApp() {
@@ -41,6 +42,7 @@ export async function buildApp() {
   await app.register(walletRoutes);
   await app.register(categoryRoutes);
   await app.register(transactionRoutes);
+  await app.register(transferRoutes);
   await app.register(capRoutes);
   await app.register(goalRoutes);
   await app.register(incomeRoutes);
