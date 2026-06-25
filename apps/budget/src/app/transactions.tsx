@@ -143,6 +143,9 @@ export default function TransactionsScreen() {
               <Icon name="chevron-left" size={24} color={colors.textPrimary} />
             </Pressable>
             <Text style={[styles.title, { color: colors.textPrimary, flex: 1 }]}>Transactions</Text>
+            <Pressable onPress={() => router.push("/calendar")} style={[styles.iconBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+              <Icon name="calendar-month" size={20} color={colors.textSecondary} />
+            </Pressable>
             <Pressable onPress={() => setShowSearch((s) => !s)} style={[styles.iconBtn, { backgroundColor: showSearch ? colors.tintTealStrong : colors.surfaceGlass, borderColor: showSearch ? colors.hairlineBright : colors.hairline }]}>
               <Icon name="search" size={21} color={showSearch ? colors.accentCyan : colors.textSecondary} />
             </Pressable>

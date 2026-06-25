@@ -130,6 +130,10 @@ export const transactions = pgTable("transactions", {
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   auto: boolean("auto").notNull().default(false),
   needsReview: boolean("needs_review").notNull().default(false),
+  /** Planned (unpaid) transactions don't affect wallet balance until paid. */
+  paid: boolean("paid").notNull().default(true),
+  /** none | daily | weekly | monthly */
+  recurrence: varchar("recurrence", { length: 16 }).notNull().default("none"),
   /** Provider/SMS reference, used to dedupe auto-captured transactions. */
   externalRef: varchar("external_ref", { length: 160 }),
   createdAt: createdAt(),

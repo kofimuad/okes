@@ -1,15 +1,19 @@
 import { transactions, wallets } from "@okes/db";
-import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db } from "../db";
 import { amountMinorField, currencyField, parseOr400 } from "../lib/http";
 import { notifyCapCrossing } from "../lib/push";
 
+const recurrenceEnum = z.enum(["none", "daily", "weekly", "monthly"]);
 const listQuery = z.object({
   walletId: z.uuid().optional(),
   direction: z.enum(["in", "out"]).optional(),
   needsReview: z.enum(["true", "false"]).optional(),
+  paid: z.enum(["true", "false"]).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
   limit: z.coerce.number().int().positive().max(200).default(50),
 });
 
@@ -23,6 +27,8 @@ const createBody = z.object({
   occurredAt: z.coerce.date().optional(),
   auto: z.boolean().default(false),
   needsReview: z.boolean().default(false),
+  paid: z.boolean().default(true),
+  recurrence: recurrenceEnum.default("none"),
 });
 const importBody = z.object({
   items: z
@@ -48,6 +54,8 @@ const updateBody = z
     categoryId: z.uuid().nullable(),
     needsReview: z.boolean(),
     occurredAt: z.coerce.date(),
+    paid: z.boolean(),
+    recurrence: recurrenceEnum,
   })
   .partial();
 
@@ -63,6 +71,18 @@ async function ownsWallet(userId: string, walletId: string): Promise<boolean> {
 const signed = (direction: "in" | "out", amountMinor: number) =>
   direction === "in" ? amountMinor : -amountMinor;
 
+/** A planned (unpaid) transaction doesn't move the wallet balance. */
+const contribution = (paid: boolean, direction: "in" | "out", amountMinor: number) =>
+  paid ? signed(direction, amountMinor) : 0;
+
+function nextOccurrence(from: Date, recurrence: string): Date {
+  const d = new Date(from);
+  if (recurrence === "daily") d.setDate(d.getDate() + 1);
+  else if (recurrence === "weekly") d.setDate(d.getDate() + 7);
+  else if (recurrence === "monthly") d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
 export async function transactionRoutes(app: FastifyInstance) {
   const auth = { preHandler: [app.authenticate] };
 
@@ -73,6 +93,9 @@ export async function transactionRoutes(app: FastifyInstance) {
     if (q.walletId) conditions.push(eq(transactions.walletId, q.walletId));
     if (q.direction) conditions.push(eq(transactions.direction, q.direction));
     if (q.needsReview) conditions.push(eq(transactions.needsReview, q.needsReview === "true"));
+    if (q.paid) conditions.push(eq(transactions.paid, q.paid === "true"));
+    if (q.from) conditions.push(gte(transactions.occurredAt, q.from));
+    if (q.to) conditions.push(lte(transactions.occurredAt, q.to));
     const rows = await db
       .select()
       .from(transactions)
@@ -102,13 +125,16 @@ export async function transactionRoutes(app: FastifyInstance) {
         .insert(transactions)
         .values({ ...body, userId: req.user.sub, occurredAt: body.occurredAt ?? new Date() })
         .returning();
-      await tx
-        .update(wallets)
-        .set({ balanceMinor: sql`${wallets.balanceMinor} + ${signed(body.direction, body.amountMinor)}` })
-        .where(eq(wallets.id, body.walletId));
+      const effect = contribution(body.paid, body.direction, body.amountMinor);
+      if (effect !== 0) {
+        await tx
+          .update(wallets)
+          .set({ balanceMinor: sql`${wallets.balanceMinor} + ${effect}` })
+          .where(eq(wallets.id, body.walletId));
+      }
       return created;
     });
-    if (body.direction === "out") void notifyCapCrossing(req.user.sub, body.categoryId ?? null, body.amountMinor);
+    if (body.paid && body.direction === "out") void notifyCapCrossing(req.user.sub, body.categoryId ?? null, body.amountMinor);
     return reply.code(201).send({ transaction: row });
   });
 
@@ -177,14 +203,32 @@ export async function transactionRoutes(app: FastifyInstance) {
 
       const [updated] = await tx.update(transactions).set(body).where(eq(transactions.id, old.id)).returning();
 
-      const delta =
-        signed(body.direction ?? old.direction, body.amountMinor ?? old.amountMinor) -
-        signed(old.direction, old.amountMinor);
+      const newPaid = body.paid ?? old.paid;
+      const newDir = body.direction ?? old.direction;
+      const newAmt = body.amountMinor ?? old.amountMinor;
+      const delta = contribution(newPaid, newDir, newAmt) - contribution(old.paid, old.direction, old.amountMinor);
       if (delta !== 0) {
         await tx
           .update(wallets)
           .set({ balanceMinor: sql`${wallets.balanceMinor} + ${delta}` })
           .where(eq(wallets.id, old.walletId));
+      }
+
+      // When a recurring planned item is paid, queue the next occurrence.
+      const recurrence = body.recurrence ?? old.recurrence;
+      if (!old.paid && newPaid && recurrence !== "none") {
+        await tx.insert(transactions).values({
+          userId: req.user.sub,
+          walletId: old.walletId,
+          direction: newDir,
+          amountMinor: newAmt,
+          currency: old.currency,
+          party: old.party,
+          categoryId: old.categoryId,
+          occurredAt: nextOccurrence(updated!.occurredAt, recurrence),
+          paid: false,
+          recurrence,
+        });
       }
       return updated;
     });
@@ -201,10 +245,13 @@ export async function transactionRoutes(app: FastifyInstance) {
         .where(and(eq(transactions.id, req.params.id), eq(transactions.userId, req.user.sub)));
       if (!old) return false;
       await tx.delete(transactions).where(eq(transactions.id, old.id));
-      await tx
-        .update(wallets)
-        .set({ balanceMinor: sql`${wallets.balanceMinor} - ${signed(old.direction, old.amountMinor)}` })
-        .where(eq(wallets.id, old.walletId));
+      const effect = contribution(old.paid, old.direction, old.amountMinor);
+      if (effect !== 0) {
+        await tx
+          .update(wallets)
+          .set({ balanceMinor: sql`${wallets.balanceMinor} - ${effect}` })
+          .where(eq(wallets.id, old.walletId));
+      }
       return true;
     });
     if (!ok) return reply.code(404).send({ error: "Not found" });

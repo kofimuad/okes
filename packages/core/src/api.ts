@@ -41,6 +41,8 @@ export interface TransactionDto {
   occurredAt: string;
   auto: boolean;
   needsReview: boolean;
+  paid: boolean;
+  recurrence: string;
 }
 
 export interface GoalDto {
@@ -159,6 +161,8 @@ export interface NewTransactionInput {
   auto?: boolean;
   needsReview?: boolean;
   occurredAt?: string;
+  paid?: boolean;
+  recurrence?: "none" | "daily" | "weekly" | "monthly";
 }
 export interface NewGoalInput {
   name: string;
@@ -228,6 +232,9 @@ export interface ApiClient {
     needsReview?: boolean;
     walletId?: string;
     direction?: "in" | "out";
+    paid?: boolean;
+    from?: string;
+    to?: string;
   }): Promise<{ transactions: TransactionDto[] }>;
   listGoals(): Promise<{ goals: GoalDto[] }>;
   listCaps(): Promise<{ caps: CapDto[] }>;
@@ -246,7 +253,7 @@ export interface ApiClient {
   createTransaction(input: NewTransactionInput): Promise<{ transaction: TransactionDto }>;
   updateTransaction(
     id: string,
-    patch: Partial<{ categoryId: string | null; needsReview: boolean; party: string; amountMinor: number; direction: "in" | "out"; occurredAt: string }>,
+    patch: Partial<{ categoryId: string | null; needsReview: boolean; party: string; amountMinor: number; direction: "in" | "out"; occurredAt: string; paid: boolean; recurrence: "none" | "daily" | "weekly" | "monthly" }>,
   ): Promise<{ transaction: TransactionDto }>;
   createGoal(input: NewGoalInput): Promise<{ goal: GoalDto }>;
   contributeGoal(id: string, amountMinor: number): Promise<{ goal: GoalDto }>;
@@ -354,6 +361,9 @@ export function createApiClient(baseUrl: string): ApiClient {
       if (params?.needsReview !== undefined) q.set("needsReview", String(params.needsReview));
       if (params?.walletId) q.set("walletId", params.walletId);
       if (params?.direction) q.set("direction", params.direction);
+      if (params?.paid !== undefined) q.set("paid", String(params.paid));
+      if (params?.from) q.set("from", params.from);
+      if (params?.to) q.set("to", params.to);
       const qs = q.toString();
       return request<{ transactions: TransactionDto[] }>(
         `/transactions${qs ? `?${qs}` : ""}`,

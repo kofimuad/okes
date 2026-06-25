@@ -8,7 +8,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { KenteRow, ProgressRing } from "../../components/Decor";
-import { Field, ChipSelect, SheetButton, toMinor } from "../../components/forms";
+import { ChipSelect, Field, SheetButton, Toggle, toMinor } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
 import { Icon, Pill, ProgressBar, SectionHeader } from "../../components/primitives";
 import { ScreenBackground } from "../../components/ScreenBackground";
@@ -26,6 +26,12 @@ const QUICK = [
 const DIRECTION_OPTIONS: { value: "in" | "out"; label: string }[] = [
   { value: "out", label: "Spending" },
   { value: "in", label: "Income" },
+];
+const RECURRENCE_OPTIONS: { value: "none" | "daily" | "weekly" | "monthly"; label: string }[] = [
+  { value: "none", label: "Once" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
 ];
 
 function txTime(iso: string): string {
@@ -58,17 +64,17 @@ export default function CommandCenter() {
   const [direction, setDirection] = useState<"in" | "out">("out");
   const [party, setParty] = useState("");
   const [amount, setAmount] = useState("");
+  const [paid, setPaid] = useState(true);
+  const [planDate, setPlanDate] = useState("");
+  const [recurrence, setRecurrence] = useState<"none" | "daily" | "weekly" | "monthly">("none");
   const wallets = walletsQ.data?.wallets ?? [];
   const activeWallet = walletId ?? wallets[0]?.id ?? null;
 
   const addTx = useMutation({
     mutationFn: (input: NewTransactionInput) => api.createTransaction(input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["summary"] });
-      qc.invalidateQueries({ queryKey: ["caps"] });
-      qc.invalidateQueries({ queryKey: ["wallets"] });
-      setAddOpen(false); setParty(""); setAmount("");
+      for (const k of ["transactions", "summary", "caps", "wallets"]) qc.invalidateQueries({ queryKey: [k] });
+      setAddOpen(false); setParty(""); setAmount(""); setPaid(true); setPlanDate(""); setRecurrence("none");
     },
   });
 
@@ -319,11 +325,29 @@ export default function CommandCenter() {
             <ChipSelect label="TYPE" value={direction} options={DIRECTION_OPTIONS} onChange={setDirection} />
             <Field label="DESCRIPTION" value={party} onChangeText={setParty} placeholder="e.g. Bolt Food" />
             <Field label="AMOUNT (GHS)" value={amount} onChangeText={setAmount} placeholder="0.00" keyboardType="decimal-pad" />
+            <Toggle label="Already paid" value={paid} onChange={setPaid} />
+            {!paid && (
+              <>
+                <Field label="DATE (optional)" value={planDate} onChangeText={setPlanDate} placeholder="2026-07-01" />
+                <ChipSelect label="REPEAT" value={recurrence} options={RECURRENCE_OPTIONS} onChange={setRecurrence} />
+              </>
+            )}
             <SheetButton
-              label="Add transaction"
+              label={paid ? "Add transaction" : "Plan transaction"}
               busy={addTx.isPending}
               disabled={!activeWallet || toMinor(amount) <= 0}
-              onPress={() => activeWallet && addTx.mutate({ walletId: activeWallet, direction, party: party.trim() || "Transaction", amountMinor: toMinor(amount) })}
+              onPress={() =>
+                activeWallet &&
+                addTx.mutate({
+                  walletId: activeWallet,
+                  direction,
+                  party: party.trim() || "Transaction",
+                  amountMinor: toMinor(amount),
+                  paid,
+                  recurrence,
+                  occurredAt: !paid && planDate.trim() ? new Date(planDate.trim()).toISOString() : undefined,
+                })
+              }
             />
           </>
         )}
