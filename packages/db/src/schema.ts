@@ -16,6 +16,11 @@ export const walletProvider = pgEnum("wallet_provider", [
   "telecel_cash",
   "airteltigo_money",
   "bank",
+  "cash",
+  "card",
+  "savings",
+  "crypto",
+  "investment",
 ]);
 export const syncSource = pgEnum("sync_source", ["sms", "aggregator", "manual"]);
 export const txDirection = pgEnum("tx_direction", ["in", "out"]);
@@ -102,6 +107,9 @@ export const wallets = pgTable("wallets", {
   maskedNumber: varchar("masked_number", { length: 40 }).notNull(),
   balanceMinor: amount("balance_minor"),
   currency: currency(),
+  color: varchar("color", { length: 16 }),
+  isCredit: boolean("is_credit").notNull().default(false),
+  creditLimitMinor: amount("credit_limit_minor"),
   syncSource: syncSource("sync_source").notNull().default("manual"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -112,6 +120,8 @@ export const categories = pgTable("categories", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 80 }).notNull(),
   icon: varchar("icon", { length: 60 }).notNull(),
+  color: varchar("color", { length: 16 }),
+  parentId: uuid("parent_id"),
 });
 
 export const transactions = pgTable("transactions", {

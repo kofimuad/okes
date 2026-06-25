@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChipSelect, Field, SheetButton, toMinor } from "../../components/forms";
+import { ChipSelect, ColorSelect, Field, PALETTE, SheetButton, Toggle, toMinor } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
 import { Icon } from "../../components/primitives";
 import { ScreenBackground } from "../../components/ScreenBackground";
@@ -39,16 +39,22 @@ export default function WalletDetail() {
   const [masked, setMasked] = useState("");
   const [balance, setBalance] = useState("");
   const [sync, setSync] = useState<WalletDto["syncSource"]>("manual");
+  const [color, setColor] = useState(PALETTE[0]!);
+  const [isCredit, setIsCredit] = useState(false);
+  const [creditLimit, setCreditLimit] = useState("");
   const openEdit = (w: WalletDto) => {
     setLabel(w.label);
     setMasked(w.maskedNumber);
     setBalance((w.balanceMinor / 100).toFixed(2));
     setSync(w.syncSource);
+    setColor(w.color ?? PALETTE[0]!);
+    setIsCredit(w.isCredit);
+    setCreditLimit((w.creditLimitMinor / 100).toFixed(2));
     setOpen(true);
   };
 
   const update = useMutation({
-    mutationFn: (w: WalletDto) => api.updateWallet(w.id, { label: label.trim() || w.label, maskedNumber: masked.trim() || w.maskedNumber, balanceMinor: toMinor(balance), syncSource: sync }),
+    mutationFn: (w: WalletDto) => api.updateWallet(w.id, { label: label.trim() || w.label, maskedNumber: masked.trim() || w.maskedNumber, balanceMinor: toMinor(balance), syncSource: sync, color, isCredit, creditLimitMinor: isCredit ? toMinor(creditLimit) : 0 }),
     onSuccess: () => { invalidate(); setOpen(false); },
   });
   const remove = useMutation({
@@ -102,7 +108,10 @@ export default function WalletDetail() {
         <Field label="LABEL" value={label} onChangeText={setLabel} />
         <Field label="MASKED NUMBER" value={masked} onChangeText={setMasked} />
         <Field label="BALANCE (GHS)" value={balance} onChangeText={setBalance} keyboardType="decimal-pad" />
+        <ColorSelect label="COLOR" value={color} onChange={setColor} />
         <ChipSelect label="SYNC" value={sync} options={SYNC_OPTIONS} onChange={setSync} />
+        <Toggle label="Credit account" value={isCredit} onChange={setIsCredit} />
+        {isCredit && <Field label="CREDIT LIMIT (GHS)" value={creditLimit} onChangeText={setCreditLimit} keyboardType="decimal-pad" />}
         <SheetButton label="Save changes" busy={update.isPending} onPress={() => wallet && update.mutate(wallet)} />
         <Pressable style={styles.deleteBtn} onPress={() => wallet && confirmDelete(wallet)}>
           <Icon name="delete" size={18} color={colors.accentPink} />

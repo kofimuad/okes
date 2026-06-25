@@ -39,7 +39,12 @@ export type WalletProvider =
   | "mtn_momo"
   | "telecel_cash"
   | "airteltigo_money"
-  | "bank";
+  | "bank"
+  | "cash"
+  | "card"
+  | "savings"
+  | "crypto"
+  | "investment";
 
 /** How a wallet's data flows into Okes. */
 export type SyncSource = "sms" | "aggregator" | "manual";

@@ -20,13 +20,17 @@ export interface SummaryDto {
   goalCount: number;
   month: { incomeMinor: number; spendMinor: number; netMinor: number };
 }
+export type WalletProvider = "mtn_momo" | "telecel_cash" | "airteltigo_money" | "bank" | "cash" | "card" | "savings" | "crypto" | "investment";
 export interface WalletDto {
   id: string;
-  provider: "mtn_momo" | "telecel_cash" | "airteltigo_money" | "bank";
+  provider: WalletProvider;
   label: string;
   maskedNumber: string;
   balanceMinor: number;
   currency: string;
+  color: string | null;
+  isCredit: boolean;
+  creditLimitMinor: number;
   syncSource: "sms" | "aggregator" | "manual";
   lastSyncedAt: string | null;
 }
@@ -97,6 +101,8 @@ export interface CategoryDto {
   id: string;
   name: string;
   icon: string;
+  color?: string | null;
+  parentId?: string | null;
 }
 export interface CapDto {
   id: string;
@@ -150,6 +156,9 @@ export interface NewWalletInput {
   maskedNumber: string;
   balanceMinor?: number;
   currency?: string;
+  color?: string;
+  isCredit?: boolean;
+  creditLimitMinor?: number;
   syncSource?: WalletDto["syncSource"];
 }
 export interface NewTransactionInput {
@@ -200,6 +209,8 @@ export interface NewCapInput {
 export interface NewCategoryInput {
   name: string;
   icon: string;
+  color?: string;
+  parentId?: string | null;
 }
 export interface TransferInput {
   fromWalletId: string;

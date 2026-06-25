@@ -8,6 +8,8 @@ import { parseOr400 } from "../lib/http";
 const createBody = z.object({
   name: z.string().min(1).max(80),
   icon: z.string().min(1).max(60),
+  color: z.string().max(16).optional(),
+  parentId: z.uuid().nullable().optional(),
 });
 const updateBody = createBody.partial();
 

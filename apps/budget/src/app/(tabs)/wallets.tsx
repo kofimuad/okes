@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChipSelect, Field, SheetButton, toMinor } from "../../components/forms";
+import { ChipSelect, ColorSelect, Field, PALETTE, SheetButton, Toggle, toMinor } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
 import { Icon, Pill } from "../../components/primitives";
 import { ScreenBackground } from "../../components/ScreenBackground";
@@ -18,6 +18,11 @@ const PROVIDER_OPTIONS: { value: WalletDto["provider"]; label: string }[] = [
   { value: "telecel_cash", label: "Telecel" },
   { value: "airteltigo_money", label: "AirtelTigo" },
   { value: "bank", label: "Bank" },
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "savings", label: "Savings" },
+  { value: "crypto", label: "Crypto" },
+  { value: "investment", label: "Investment" },
 ];
 
 const PROVIDERS: Record<WalletDto["provider"], { label: string; icon: string; key: string }> = {
@@ -25,6 +30,11 @@ const PROVIDERS: Record<WalletDto["provider"], { label: string; icon: string; ke
   telecel_cash: { label: "Telecel Cash", icon: "account-balance-wallet", key: "pink" },
   airteltigo_money: { label: "AirtelTigo", icon: "account-balance-wallet", key: "violet" },
   bank: { label: "Bank", icon: "account-balance", key: "mint" },
+  cash: { label: "Cash", icon: "payments", key: "mint" },
+  card: { label: "Card", icon: "credit-card", key: "violet" },
+  savings: { label: "Savings", icon: "savings", key: "amber" },
+  crypto: { label: "Crypto", icon: "currency-bitcoin", key: "amber" },
+  investment: { label: "Investment", icon: "trending-up", key: "mint" },
 };
 
 export default function WalletsScreen() {
@@ -38,6 +48,9 @@ export default function WalletsScreen() {
   const [label, setLabel] = useState("");
   const [masked, setMasked] = useState("");
   const [balance, setBalance] = useState("");
+  const [color, setColor] = useState(PALETTE[0]!);
+  const [isCredit, setIsCredit] = useState(false);
+  const [creditLimit, setCreditLimit] = useState("");
 
   const create = useMutation({
     mutationFn: (input: NewWalletInput) => api.createWallet(input),
@@ -45,7 +58,7 @@ export default function WalletsScreen() {
       qc.invalidateQueries({ queryKey: ["wallets"] });
       qc.invalidateQueries({ queryKey: ["summary"] });
       setOpen(false);
-      setLabel(""); setMasked(""); setBalance("");
+      setLabel(""); setMasked(""); setBalance(""); setColor(PALETTE[0]!); setIsCredit(false); setCreditLimit("");
     },
   });
 
@@ -55,6 +68,9 @@ export default function WalletsScreen() {
       label: label.trim() || PROVIDER_OPTIONS.find((p) => p.value === provider)!.label,
       maskedNumber: masked.trim() || "•••• 0000",
       balanceMinor: toMinor(balance),
+      color,
+      isCredit,
+      creditLimitMinor: isCredit ? toMinor(creditLimit) : 0,
       syncSource: provider === "bank" ? "manual" : "sms",
     });
 
@@ -99,8 +115,8 @@ export default function WalletsScreen() {
                 <Pressable key={w.id} onPress={() => router.push({ pathname: "/wallet/[id]", params: { id: w.id } })}>
                 <GlassCard style={{ gap: 14 }}>
                   <View style={styles.row}>
-                    <View style={[styles.logo, { backgroundColor: tint[meta.key], borderColor: colors.hairlineBright }]}>
-                      <Icon name={meta.icon as never} size={24} color={accent[meta.key]} />
+                    <View style={[styles.logo, { backgroundColor: w.color ? `${w.color}22` : tint[meta.key], borderColor: colors.hairlineBright }]}>
+                      <Icon name={meta.icon as never} size={24} color={w.color ?? accent[meta.key]} />
                     </View>
                     <Text style={[styles.wname, { color: colors.textPrimary }]}>{w.label}</Text>
                     <Pill bg={colors.surfaceGlassStrong} style={{ paddingVertical: 5, paddingHorizontal: 9 }}>
@@ -111,7 +127,9 @@ export default function WalletsScreen() {
                     </Pill>
                   </View>
                   <Text style={[styles.balance, { color: colors.textPrimary }]}>{formatMoney(money(w.balanceMinor))}</Text>
-                  <Text style={[styles.masked, { color: colors.textMuted }]}>{w.maskedNumber}</Text>
+                  <Text style={[styles.masked, { color: colors.textMuted }]}>
+                    {w.maskedNumber}{w.isCredit ? ` · credit limit ${formatMoney(money(w.creditLimitMinor), { withCode: false })}` : ""}
+                  </Text>
                 </GlassCard>
                 </Pressable>
               );
@@ -130,6 +148,9 @@ export default function WalletsScreen() {
         <Field label="LABEL" value={label} onChangeText={setLabel} placeholder="e.g. MTN MoMo" />
         <Field label="MASKED NUMBER" value={masked} onChangeText={setMasked} placeholder="•••• 0241" />
         <Field label="CURRENT BALANCE (GHS)" value={balance} onChangeText={setBalance} placeholder="0.00" keyboardType="decimal-pad" />
+        <ColorSelect label="COLOR" value={color} onChange={setColor} />
+        <Toggle label="Credit account" value={isCredit} onChange={setIsCredit} />
+        {isCredit && <Field label="CREDIT LIMIT (GHS)" value={creditLimit} onChangeText={setCreditLimit} placeholder="5000" keyboardType="decimal-pad" />}
         {create.isError ? <Text style={{ color: colors.accentPink, fontFamily: fonts.body, fontSize: 13 }}>Could not link wallet. Try again.</Text> : null}
         <SheetButton label="Link wallet" onPress={submit} busy={create.isPending} />
       </Sheet>

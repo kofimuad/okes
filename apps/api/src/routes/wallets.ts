@@ -6,11 +6,14 @@ import { db } from "../db";
 import { amountMinorField, currencyField, parseOr400 } from "../lib/http";
 
 const createBody = z.object({
-  provider: z.enum(["mtn_momo", "telecel_cash", "airteltigo_money", "bank"]),
+  provider: z.enum(["mtn_momo", "telecel_cash", "airteltigo_money", "bank", "cash", "card", "savings", "crypto", "investment"]),
   label: z.string().min(1).max(120),
   maskedNumber: z.string().min(1).max(40),
   balanceMinor: amountMinorField.default(0),
   currency: currencyField,
+  color: z.string().max(16).optional(),
+  isCredit: z.boolean().default(false),
+  creditLimitMinor: amountMinorField.default(0),
   syncSource: z.enum(["sms", "aggregator", "manual"]).default("manual"),
 });
 const updateBody = createBody.partial();

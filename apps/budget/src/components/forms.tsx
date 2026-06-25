@@ -99,6 +99,36 @@ export function Toggle({
   );
 }
 
+export const PALETTE = ["#58bab8", "#9788c9", "#6cba92", "#d6ae66", "#d4836e", "#5b8dd6", "#c96f9b", "#8a93a6"];
+
+export function ColorSelect({
+  label,
+  value,
+  onChange,
+  options = PALETTE,
+}: {
+  label: string;
+  value: string;
+  onChange: (c: string) => void;
+  options?: string[];
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {options.map((c) => (
+          <Pressable
+            key={c}
+            onPress={() => onChange(c)}
+            style={[styles.swatch, { backgroundColor: c, borderColor: value === c ? colors.textPrimary : "transparent" }]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function SheetButton({
   label,
   onPress,
@@ -144,4 +174,5 @@ const styles = StyleSheet.create({
   toggleLabel: { fontFamily: fonts.medium, fontSize: 14 },
   track: { width: 46, height: 27, borderRadius: 100, padding: 3, flexDirection: "row", alignItems: "center" },
   knob: { width: 21, height: 21, borderRadius: 100, backgroundColor: "#f2f4f8" },
+  swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2 },
 });

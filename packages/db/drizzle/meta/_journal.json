@@ -57,6 +57,13 @@
       "when": 1782366448209,
       "tag": "0007_bitter_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782367066915,
+      "tag": "0008_great_captain_midlands",
+      "breakpoints": true
     }
   ]
 }
