@@ -1,42 +1,53 @@
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
+function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
+  const [sx, sy] = polar(cx, cy, r, startDeg);
+  const [ex, ey] = polar(cx, cy, r, endDeg);
+  const large = endDeg - startDeg > 180 ? 1 : 0;
+  return `M ${sx} ${sy} A ${r} ${r} 0 ${large} 1 ${ex} ${ey}`;
+}
+
+/** Segmented ring — separated, rounded arc segments (one per slice). */
 export function DonutChart({
-  size = 168,
-  stroke = 26,
+  size = 172,
+  stroke = 22,
+  gap = 9,
   slices,
   track,
 }: {
   size?: number;
   stroke?: number;
+  gap?: number;
   slices: { value: number; color: string }[];
   track: string;
 }) {
   const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const total = slices.reduce((s, x) => s + x.value, 0) || 1;
-  let offset = 0;
+  const cx = size / 2;
+  const cy = size / 2;
+  const visible = slices.filter((s) => s.value > 0);
+  const total = visible.reduce((s, x) => s + x.value, 0) || 1;
+  const single = visible.length === 1;
+
+  let cursor = 0;
+  const segs = visible.map((s) => {
+    const sweep = (s.value / total) * 360;
+    const g = single ? 0 : gap;
+    const start = cursor + g / 2;
+    const end = cursor + sweep - g / 2;
+    cursor += sweep;
+    return { d: arcPath(cx, cy, r, start, Math.max(end, start + 0.01)), color: s.color };
+  });
+
   return (
     <Svg width={size} height={size}>
-      <Circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
-      {slices.map((s, i) => {
-        const len = (s.value / total) * c;
-        const el = (
-          <Circle
-            key={i}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            stroke={s.color}
-            strokeWidth={stroke}
-            fill="none"
-            strokeDasharray={`${len} ${c - len}`}
-            strokeDashoffset={-offset}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-        offset += len;
-        return el;
-      })}
+      <Circle cx={cx} cy={cy} r={r} stroke={track} strokeWidth={stroke} fill="none" opacity={0.5} />
+      {segs.map((seg, i) => (
+        <Path key={i} d={seg.d} stroke={seg.color} strokeWidth={stroke} strokeLinecap="round" fill="none" />
+      ))}
     </Svg>
   );
 }

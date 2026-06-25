@@ -1,4 +1,4 @@
-import { formatMoney, money, type NewTransactionInput, type TransactionDto } from "@okes/core";
+import { formatMoney, money, type TransactionDto } from "@okes/core";
 import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
@@ -8,7 +8,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { ProgressRing } from "../../components/Decor";
-import { ChipSelect, Field, SheetButton, Toggle, toMinor } from "../../components/forms";
+import { ChipSelect, Field, SheetButton, toMinor } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
 import { Icon, Pill, ProgressBar, SectionHeader } from "../../components/primitives";
 import { ScreenBackground } from "../../components/ScreenBackground";
@@ -22,17 +22,6 @@ const QUICK = [
   { label: "Goals", icon: "savings", key: "mint", route: "/goals" },
   { label: "Scan", icon: "document-scanner", key: "amber", route: null },
 ] as const;
-
-const DIRECTION_OPTIONS: { value: "in" | "out"; label: string }[] = [
-  { value: "out", label: "Spending" },
-  { value: "in", label: "Income" },
-];
-const RECURRENCE_OPTIONS: { value: "none" | "daily" | "weekly" | "monthly"; label: string }[] = [
-  { value: "none", label: "Once" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-];
 
 function txTime(iso: string): string {
   const d = new Date(iso);
@@ -59,24 +48,7 @@ export default function CommandCenter() {
   const accent: Record<string, string> = { cyan: colors.accentCyan, violet: colors.accentViolet, mint: colors.accentMint, amber: colors.accentAmber, pink: colors.accentPink };
   const tint: Record<string, string> = { cyan: colors.tintTeal, violet: colors.tintViolet, mint: colors.tintGreen, amber: colors.tintGold, pink: colors.tintClay };
 
-  const [addOpen, setAddOpen] = useState(false);
-  const [walletId, setWalletId] = useState<string | null>(null);
-  const [direction, setDirection] = useState<"in" | "out">("out");
-  const [party, setParty] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paid, setPaid] = useState(true);
-  const [planDate, setPlanDate] = useState("");
-  const [recurrence, setRecurrence] = useState<"none" | "daily" | "weekly" | "monthly">("none");
   const wallets = walletsQ.data?.wallets ?? [];
-  const activeWallet = walletId ?? wallets[0]?.id ?? null;
-
-  const addTx = useMutation({
-    mutationFn: (input: NewTransactionInput) => api.createTransaction(input),
-    onSuccess: () => {
-      for (const k of ["transactions", "summary", "caps", "wallets"]) qc.invalidateQueries({ queryKey: [k] });
-      setAddOpen(false); setParty(""); setAmount(""); setPaid(true); setPlanDate(""); setRecurrence("none");
-    },
-  });
 
   const [transferOpen, setTransferOpen] = useState(false);
   const [fromW, setFromW] = useState<string | null>(null);
@@ -185,7 +157,7 @@ export default function CommandCenter() {
                 key={q.label}
                 style={styles.quickItem}
                 onPress={() => {
-                  if (q.label === "Add") setAddOpen(true);
+                  if (q.label === "Add") router.push("/new");
                   else if (q.label === "Send") setTransferOpen(true);
                   else if (q.label === "Scan") Alert.alert("Coming soon", "Receipt scanning is on the way.");
                   else if (q.route) router.push(q.route);
@@ -310,47 +282,6 @@ export default function CommandCenter() {
           </View>
         </ScrollView>
       </SafeAreaView>
-
-      <Sheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add transaction">
-        {wallets.length === 0 ? (
-          <View style={{ gap: 12, alignItems: "center", paddingVertical: 8 }}>
-            <Icon name="account-balance-wallet" size={28} color={colors.textMuted} />
-            <Text style={[styles.muted, { color: colors.textSecondary }]}>Link a wallet first to add transactions.</Text>
-            <SheetButton label="Go to Wallets" onPress={() => { setAddOpen(false); router.push("/wallets"); }} />
-          </View>
-        ) : (
-          <>
-            <ChipSelect label="WALLET" value={activeWallet ?? ""} options={wallets.map((w) => ({ value: w.id, label: w.label }))} onChange={setWalletId} />
-            <ChipSelect label="TYPE" value={direction} options={DIRECTION_OPTIONS} onChange={setDirection} />
-            <Field label="DESCRIPTION" value={party} onChangeText={setParty} placeholder="e.g. Bolt Food" />
-            <Field label="AMOUNT (GHS)" value={amount} onChangeText={setAmount} placeholder="0.00" keyboardType="decimal-pad" />
-            <Toggle label="Already paid" value={paid} onChange={setPaid} />
-            {!paid && (
-              <>
-                <Field label="DATE (optional)" value={planDate} onChangeText={setPlanDate} placeholder="2026-07-01" />
-                <ChipSelect label="REPEAT" value={recurrence} options={RECURRENCE_OPTIONS} onChange={setRecurrence} />
-              </>
-            )}
-            <SheetButton
-              label={paid ? "Add transaction" : "Plan transaction"}
-              busy={addTx.isPending}
-              disabled={!activeWallet || toMinor(amount) <= 0}
-              onPress={() =>
-                activeWallet &&
-                addTx.mutate({
-                  walletId: activeWallet,
-                  direction,
-                  party: party.trim() || "Transaction",
-                  amountMinor: toMinor(amount),
-                  paid,
-                  recurrence,
-                  occurredAt: !paid && planDate.trim() ? new Date(planDate.trim()).toISOString() : undefined,
-                })
-              }
-            />
-          </>
-        )}
-      </Sheet>
 
       <Sheet visible={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer between wallets">
         {wallets.length < 2 ? (
