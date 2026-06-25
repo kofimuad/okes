@@ -130,6 +130,9 @@ export default function CommandCenter() {
               <Text style={[styles.greeting, { color: colors.textPrimary }]}>Good morning, {firstName}</Text>
             </View>
             <View style={styles.headerActions}>
+              <Pressable style={[styles.circleBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]} onPress={() => router.push("/analytics")}>
+                <Icon name="insights" size={22} color={colors.textPrimary} />
+              </Pressable>
               <Pressable style={[styles.circleBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]} onPress={() => router.push("/alerts")}>
                 <Icon name="notifications" size={22} color={colors.textPrimary} />
                 <View style={[styles.dot, { backgroundColor: colors.accentPink, borderColor: colors.bgDeep }]} />

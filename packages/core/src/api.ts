@@ -130,6 +130,17 @@ export interface NotifPrefs {
   crew: boolean;
 }
 
+export interface AnalyticsSlice {
+  name: string;
+  amountMinor: number;
+}
+export interface AnalyticsDto {
+  balanceMinor: number;
+  income: { totalMinor: number; byCategory: AnalyticsSlice[] };
+  expense: { totalMinor: number; byCategory: AnalyticsSlice[] };
+  series: { label: string; income: number; spend: number }[];
+}
+
 export interface NewWalletInput {
   provider: WalletDto["provider"];
   label: string;
@@ -224,6 +235,7 @@ export interface ApiClient {
   listCrew(): Promise<{ crew: CrewDto[] }>;
   listApprovals(): Promise<{ approvals: ApprovalDto[] }>;
   getProfile(): Promise<{ profile: ProfileDto }>;
+  getAnalytics(months?: number): Promise<AnalyticsDto>;
   listMissions(): Promise<{ missions: MissionDto[] }>;
   claimMission(key: string): Promise<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>;
   registerDevice(token: string, platform?: string): Promise<{ ok: true }>;
@@ -353,6 +365,7 @@ export function createApiClient(baseUrl: string): ApiClient {
     listCrew: () => request<{ crew: CrewDto[] }>("/crew"),
     listApprovals: () => request<{ approvals: ApprovalDto[] }>("/approvals"),
     getProfile: () => request<{ profile: ProfileDto }>("/profile"),
+    getAnalytics: (months) => request<AnalyticsDto>(`/analytics${months ? `?months=${months}` : ""}`),
     listMissions: () => request<{ missions: MissionDto[] }>("/missions"),
     claimMission: (key) =>
       request<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>(`/missions/${key}/claim`, { method: "POST" }),

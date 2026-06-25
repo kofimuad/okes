@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import Fastify from "fastify";
 import { env } from "./env";
+import { analyticsRoutes } from "./routes/analytics";
 import { approvalRoutes } from "./routes/approvals";
 import { authRoutes } from "./routes/auth";
 import { capRoutes } from "./routes/caps";
@@ -55,6 +56,7 @@ export async function buildApp() {
   await app.register(approvalRoutes);
   // Dashboard
   await app.register(summaryRoutes);
+  await app.register(analyticsRoutes);
 
   return app;
 }

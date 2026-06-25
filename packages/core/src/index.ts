@@ -210,6 +210,8 @@ export type {
   CapDto,
   CategoryDto,
   CrewDto,
+  AnalyticsDto,
+  AnalyticsSlice,
   CrewInviteDto,
   GoalDto,
   ImportTxItem,
