@@ -17,6 +17,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://okes-production.up.railway.app"
       }
