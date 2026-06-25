@@ -58,6 +58,7 @@ export interface CrewDto {
   initial: string;
   role: "watcher" | "accountability" | "guardian";
   online: boolean;
+  friendUserId?: string | null;
 }
 export interface ApprovalDto {
   id: string;
@@ -66,6 +67,29 @@ export interface ApprovalDto {
   reason: string;
   status: "pending" | "approved" | "declined";
   guardianCrewId: string | null;
+}
+export interface CrewInviteDto {
+  id: string;
+  role: CrewDto["role"];
+  createdAt: string;
+  inviterName: string;
+}
+export interface WatchingDto {
+  ownerId: string;
+  name: string;
+  role: CrewDto["role"];
+  balanceMinor: number;
+  capsNear: number;
+  capsOver: number;
+}
+export interface IncomingApprovalDto {
+  id: string;
+  amountMinor: number;
+  currency: string;
+  reason: string;
+  status: "pending" | "approved" | "declined";
+  createdAt: string;
+  requesterName: string;
 }
 export interface CategoryDto {
   id: string;
@@ -230,7 +254,15 @@ export interface ApiClient {
   createCrewMember(input: NewCrewInput): Promise<{ member: CrewDto }>;
   updateCrewMember(id: string, patch: { role?: CrewDto["role"]; online?: boolean }): Promise<{ member: CrewDto }>;
   deleteCrewMember(id: string): Promise<{ ok: true }>;
+  createApproval(amountMinor: number, reason: string): Promise<{ approval: ApprovalDto }>;
   decideApproval(id: string, status: "approved" | "declined"): Promise<{ approval: ApprovalDto }>;
+  inviteCrew(email: string, role: CrewDto["role"]): Promise<{ inviteeExists: boolean }>;
+  listIncomingInvites(): Promise<{ invites: CrewInviteDto[] }>;
+  acceptInvite(id: string): Promise<{ ok: true }>;
+  declineInvite(id: string): Promise<{ ok: true }>;
+  listWatching(): Promise<{ watching: WatchingDto[] }>;
+  listIncomingApprovals(): Promise<{ approvals: IncomingApprovalDto[] }>;
+  decideIncomingApproval(id: string, status: "approved" | "declined"): Promise<{ approval: ApprovalDto }>;
 }
 
 export function createApiClient(baseUrl: string): ApiClient {
@@ -361,7 +393,18 @@ export function createApiClient(baseUrl: string): ApiClient {
     updateCrewMember: (id, patch) =>
       request<{ member: CrewDto }>(`/crew/${id}`, { method: "PATCH", body: patch }),
     deleteCrewMember: (id) => request<{ ok: true }>(`/crew/${id}`, { method: "DELETE" }),
+    createApproval: (amountMinor, reason) =>
+      request<{ approval: ApprovalDto }>("/approvals", { method: "POST", body: { amountMinor, reason } }),
     decideApproval: (id, status) =>
       request<{ approval: ApprovalDto }>(`/approvals/${id}`, { method: "PATCH", body: { status } }),
+    inviteCrew: (email, role) =>
+      request<{ inviteeExists: boolean }>("/crew/invites", { method: "POST", body: { email, role } }),
+    listIncomingInvites: () => request<{ invites: CrewInviteDto[] }>("/crew/invites/incoming"),
+    acceptInvite: (id) => request<{ ok: true }>(`/crew/invites/${id}/accept`, { method: "POST" }),
+    declineInvite: (id) => request<{ ok: true }>(`/crew/invites/${id}/decline`, { method: "POST" }),
+    listWatching: () => request<{ watching: WatchingDto[] }>("/crew/watching"),
+    listIncomingApprovals: () => request<{ approvals: IncomingApprovalDto[] }>("/approvals/incoming"),
+    decideIncomingApproval: (id, status) =>
+      request<{ approval: ApprovalDto }>(`/approvals/${id}/decide`, { method: "POST", body: { status } }),
   };
 }

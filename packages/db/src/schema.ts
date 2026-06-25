@@ -179,6 +179,18 @@ export const crew = pgTable("crew", {
   createdAt: createdAt(),
 });
 
+/** Pending invitations to join someone's crew (by email, even pre-signup). */
+export const crewInvites = pgTable("crew_invites", {
+  id: id(),
+  inviterId: uuid("inviter_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  inviteeEmail: varchar("invitee_email", { length: 255 }).notNull(),
+  role: crewRole("role").notNull().default("watcher"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  createdAt: createdAt(),
+});
+
 export const incomeStreams = pgTable("income_streams", {
   id: id(),
   userId: uuid("user_id")
@@ -197,6 +209,10 @@ export const approvals = pgTable("approvals", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   guardianCrewId: uuid("guardian_crew_id").references(() => crew.id, {
+    onDelete: "set null",
+  }),
+  /** The guardian (Okes user) this request is routed to, if any. */
+  guardianUserId: uuid("guardian_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
   amountMinor: amount("amount_minor"),

@@ -1,4 +1,4 @@
-import { formatMoney, money, type CrewDto, type NewCrewInput } from "@okes/core";
+import { formatMoney, money, type CrewDto } from "@okes/core";
 import { fonts, radius } from "@okes/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -32,19 +32,37 @@ export default function CrewScreen() {
   const { colors } = useTheme();
   const qc = useQueryClient();
   const crewQ = useQuery({ queryKey: ["crew"], queryFn: () => api.listCrew() });
-  const aprQ = useQuery({ queryKey: ["approvals"], queryFn: () => api.listApprovals() });
+  const invitesQ = useQuery({ queryKey: ["incomingInvites"], queryFn: () => api.listIncomingInvites() });
+  const watchingQ = useQuery({ queryKey: ["watching"], queryFn: () => api.listWatching() });
+  const incomingAprQ = useQuery({ queryKey: ["incomingApprovals"], queryFn: () => api.listIncomingApprovals() });
+
+  const tint: Record<string, string> = { pink: colors.tintClay, amber: colors.tintGold, cyan: colors.tintTeal };
+  const accent: Record<string, string> = { pink: colors.accentPink, amber: colors.accentAmber, cyan: colors.accentCyan };
 
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<CrewDto["role"]>("watcher");
 
   const invite = useMutation({
-    mutationFn: (input: NewCrewInput) => api.createCrewMember(input),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["crew"] }); setInviteOpen(false); setName(""); setRole("watcher"); },
+    mutationFn: () => api.inviteCrew(email.trim().toLowerCase(), role),
+    onSuccess: (res) => {
+      setInviteOpen(false); setEmail(""); setRole("watcher");
+      Alert.alert(
+        "Invitation sent",
+        res.inviteeExists ? "They'll see it in their Crew tab." : "We'll link them once they join Okes with that email.",
+      );
+    },
+    onError: (e) => Alert.alert("Couldn't send invite", e instanceof Error ? e.message : "Try again."),
   });
-  const decide = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: "approved" | "declined" }) => api.decideApproval(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["approvals"] }),
+
+  const invalidateCrew = () => {
+    for (const k of ["crew", "incomingInvites", "watching", "incomingApprovals"]) qc.invalidateQueries({ queryKey: [k] });
+  };
+  const acceptInvite = useMutation({ mutationFn: (id: string) => api.acceptInvite(id), onSuccess: invalidateCrew });
+  const declineInvite = useMutation({ mutationFn: (id: string) => api.declineInvite(id), onSuccess: invalidateCrew });
+  const decideIncoming = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "approved" | "declined" }) => api.decideIncomingApproval(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["incomingApprovals"] }),
   });
 
   const [manage, setManage] = useState<CrewDto | null>(null);
@@ -64,12 +82,10 @@ export default function CrewScreen() {
       { text: "Remove", style: "destructive", onPress: () => removeMember.mutate(m.id) },
     ]);
 
-  const tint: Record<string, string> = { pink: colors.tintClay, amber: colors.tintGold, cyan: colors.tintTeal };
-  const accent: Record<string, string> = { pink: colors.accentPink, amber: colors.accentAmber, cyan: colors.accentCyan };
-  const avatarCol: Record<string, string> = { pink: colors.accentPink, amber: colors.accentAmber, cyan: colors.accentCyan };
-
   const crew = crewQ.data?.crew ?? [];
-  const pending = (aprQ.data?.approvals ?? []).filter((a) => a.status === "pending");
+  const invites = invitesQ.data?.invites ?? [];
+  const watching = watchingQ.data?.watching ?? [];
+  const incoming = incomingAprQ.data?.approvals ?? [];
 
   return (
     <ScreenBackground>
@@ -83,34 +99,81 @@ export default function CrewScreen() {
             </Pressable>
           </View>
 
-          {pending.length > 0 && (
-            <GlassCard tint={colors.tintClay} style={styles.approval}>
+          {/* Invitations waiting for me */}
+          {invites.map((inv) => {
+            const r = ROLES[inv.role];
+            return (
+              <GlassCard key={inv.id} tint={colors.tintTeal} style={styles.approval}>
+                <View style={styles.apTop}>
+                  <View style={[styles.apIcon, { backgroundColor: colors.surfaceGlassStrong }]}>
+                    <Icon name="mail" size={20} color={colors.accentCyan} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.apTitle, { color: colors.textPrimary }]}>{inv.inviterName} invited you</Text>
+                    <Text style={[styles.apSub, { color: colors.textSecondary }]}>As {r.label} · {DESC[inv.role]}</Text>
+                  </View>
+                </View>
+                <View style={styles.apActions}>
+                  <Pressable style={[styles.apBtn, { backgroundColor: colors.surfaceGlassStrong, borderColor: colors.hairline }]} onPress={() => declineInvite.mutate(inv.id)}>
+                    <Text style={[styles.apBtnText, { color: colors.accentPink }]}>Decline</Text>
+                  </Pressable>
+                  <Pressable style={[styles.apBtn, { backgroundColor: colors.accentMint, borderColor: colors.accentMint }]} onPress={() => acceptInvite.mutate(inv.id)}>
+                    <Text style={[styles.apBtnText, { color: colors.onAccent }]}>Accept</Text>
+                  </Pressable>
+                </View>
+              </GlassCard>
+            );
+          })}
+
+          {/* Approval requests routed to me as a guardian */}
+          {incoming.map((a) => (
+            <GlassCard key={a.id} tint={colors.tintClay} style={styles.approval}>
               <View style={styles.apTop}>
                 <View style={[styles.apIcon, { backgroundColor: colors.surfaceGlassStrong }]}>
                   <Icon name="gpp-maybe" size={22} color={colors.accentPink} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={[styles.apTitle, { color: colors.textPrimary }]}>Guardian approval pending</Text>
-                  <Text style={[styles.apSub, { color: colors.textSecondary }]}>
-                    {formatMoney(money(pending[0]!.amountMinor))} · {pending[0]!.reason}
-                  </Text>
+                  <Text style={[styles.apTitle, { color: colors.textPrimary }]}>{a.requesterName} needs approval</Text>
+                  <Text style={[styles.apSub, { color: colors.textSecondary }]}>{formatMoney(money(a.amountMinor))} · {a.reason}</Text>
                 </View>
               </View>
               <View style={styles.apActions}>
-                <Pressable
-                  style={[styles.apBtn, { backgroundColor: colors.surfaceGlassStrong, borderColor: colors.hairline }]}
-                  onPress={() => decide.mutate({ id: pending[0]!.id, status: "declined" })}
-                >
+                <Pressable style={[styles.apBtn, { backgroundColor: colors.surfaceGlassStrong, borderColor: colors.hairline }]} onPress={() => decideIncoming.mutate({ id: a.id, status: "declined" })}>
                   <Text style={[styles.apBtnText, { color: colors.accentPink }]}>Decline</Text>
                 </Pressable>
-                <Pressable
-                  style={[styles.apBtn, { backgroundColor: colors.accentMint, borderColor: colors.accentMint }]}
-                  onPress={() => decide.mutate({ id: pending[0]!.id, status: "approved" })}
-                >
+                <Pressable style={[styles.apBtn, { backgroundColor: colors.accentMint, borderColor: colors.accentMint }]} onPress={() => decideIncoming.mutate({ id: a.id, status: "approved" })}>
                   <Text style={[styles.apBtnText, { color: colors.onAccent }]}>Approve</Text>
                 </Pressable>
               </View>
             </GlassCard>
+          ))}
+
+          {/* People who trust me with their budget */}
+          {watching.length > 0 && (
+            <>
+              <SectionHeader icon="visibility" iconColor={colors.accentViolet} title="You're watching" />
+              {watching.map((w) => {
+                const r = ROLES[w.role];
+                return (
+                  <GlassCard key={w.ownerId} style={styles.memberRow}>
+                    <View style={[styles.avatar, { backgroundColor: accent[r.key] }]}>
+                      <Text style={[styles.avatarText, { color: colors.onAccent }]}>{w.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={[styles.mName, { color: colors.textPrimary }]}>{w.name}</Text>
+                      <Text style={[styles.apSub, { color: colors.textMuted }]}>
+                        {formatMoney(money(w.balanceMinor))}
+                        {w.capsOver > 0 ? ` · ${w.capsOver} over budget` : w.capsNear > 0 ? ` · ${w.capsNear} near a cap` : " · on track"}
+                      </Text>
+                    </View>
+                    <Pill bg={tint[r.key]}>
+                      <Icon name={r.icon as never} size={14} color={accent[r.key]} />
+                      <Text style={[styles.roleText, { color: accent[r.key] }]}>{r.label}</Text>
+                    </Pill>
+                  </GlassCard>
+                );
+              })}
+            </>
           )}
 
           <SectionHeader icon="verified-user" iconColor={colors.accentCyan} title="Trusted Crew" />
@@ -120,29 +183,35 @@ export default function CrewScreen() {
           ) : crew.length === 0 ? (
             <GlassCard style={{ alignItems: "center", gap: 6 }}>
               <Icon name="groups" size={26} color={colors.textMuted} />
-              <Text style={[styles.apSub, { color: colors.textSecondary }]}>No crew yet — invite a trusted friend</Text>
+              <Text style={[styles.apSub, { color: colors.textSecondary }]}>No crew yet — invite a trusted friend by email</Text>
             </GlassCard>
           ) : (
             crew.map((m) => {
-              const role = ROLES[m.role];
+              const r = ROLES[m.role];
+              const linked = Boolean(m.friendUserId);
               return (
                 <Pressable key={m.id} onPress={() => openManage(m)}>
-                <GlassCard style={styles.memberRow}>
-                  <View style={{ width: 46, height: 46 }}>
-                    <View style={[styles.avatar, { backgroundColor: avatarCol[role.key] }]}>
-                      <Text style={[styles.avatarText, { color: colors.onAccent }]}>{m.initial}</Text>
+                  <GlassCard style={styles.memberRow}>
+                    <View style={{ width: 46, height: 46 }}>
+                      <View style={[styles.avatar, { backgroundColor: accent[r.key] }]}>
+                        <Text style={[styles.avatarText, { color: colors.onAccent }]}>{m.initial}</Text>
+                      </View>
+                      {linked && <View style={[styles.online, { backgroundColor: colors.accentMint, borderColor: colors.bgDeep }]} />}
                     </View>
-                    {m.online && <View style={[styles.online, { backgroundColor: colors.accentMint, borderColor: colors.bgDeep }]} />}
-                  </View>
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={[styles.mName, { color: colors.textPrimary }]}>{m.name}</Text>
-                    <Text style={[styles.apSub, { color: colors.textMuted }]}>{DESC[m.role]}</Text>
-                  </View>
-                  <Pill bg={tint[role.key]}>
-                    <Icon name={role.icon as never} size={14} color={accent[role.key]} />
-                    <Text style={[styles.roleText, { color: accent[role.key] }]}>{role.label}</Text>
-                  </Pill>
-                </GlassCard>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[styles.mName, { color: colors.textPrimary }]}>{m.name}</Text>
+                        <Pill bg={linked ? colors.tintGreen : colors.surfaceGlassStrong} style={{ paddingVertical: 2, paddingHorizontal: 7 }}>
+                          <Text style={[styles.linkText, { color: linked ? colors.accentMint : colors.textMuted }]}>{linked ? "Linked" : "Pending"}</Text>
+                        </Pill>
+                      </View>
+                      <Text style={[styles.apSub, { color: colors.textMuted }]}>{DESC[m.role]}</Text>
+                    </View>
+                    <Pill bg={tint[r.key]}>
+                      <Icon name={r.icon as never} size={14} color={accent[r.key]} />
+                      <Text style={[styles.roleText, { color: accent[r.key] }]}>{r.label}</Text>
+                    </Pill>
+                  </GlassCard>
                 </Pressable>
               );
             })
@@ -151,13 +220,14 @@ export default function CrewScreen() {
       </SafeAreaView>
 
       <Sheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite to your crew">
-        <Field label="NAME" value={name} onChangeText={setName} placeholder="e.g. Ama Owusu" />
+        <Field label="EMAIL" value={email} onChangeText={setEmail} placeholder="friend@email.com" keyboardType="default" autoCapitalize="none" />
         <ChipSelect label="ROLE" value={role} options={ROLE_OPTIONS} onChange={setRole} />
+        <Text style={[styles.apSub, { color: colors.textMuted }]}>{DESC[role]}</Text>
         <SheetButton
-          label="Add to crew"
+          label="Send invitation"
           busy={invite.isPending}
-          disabled={!name.trim()}
-          onPress={() => invite.mutate({ name: name.trim(), initial: (name.trim()[0] || "?").toUpperCase(), role })}
+          disabled={!email.includes("@")}
+          onPress={() => invite.mutate()}
         />
       </Sheet>
 
@@ -195,4 +265,5 @@ const styles = StyleSheet.create({
   online: { position: "absolute", right: 0, bottom: 0, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
   mName: { fontFamily: fonts.semibold, fontSize: 15 },
   roleText: { fontFamily: fonts.bold, fontSize: 11 },
+  linkText: { fontFamily: fonts.semibold, fontSize: 10 },
 });
