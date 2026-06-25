@@ -163,6 +163,8 @@ export const caps = pgTable("caps", {
     .references(() => categories.id, { onDelete: "cascade" }),
   limitMinor: amount("limit_minor"),
   currency: currency(),
+  /** daily | weekly | monthly */
+  period: varchar("period", { length: 16 }).notNull().default("monthly"),
   alertThresholds: integer("alert_thresholds").array().notNull().default([70, 90, 100]),
   lockAtLimit: boolean("lock_at_limit").notNull().default(false),
   notifyCrew: boolean("notify_crew").notNull().default(false),

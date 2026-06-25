@@ -50,6 +50,13 @@
       "when": 1782365523435,
       "tag": "0006_cuddly_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782366448209,
+      "tag": "0007_bitter_puppet_master",
+      "breakpoints": true
     }
   ]
 }

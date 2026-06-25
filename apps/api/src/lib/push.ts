@@ -2,7 +2,7 @@ import { formatMoney, money } from "@okes/core";
 import { caps, categories, deviceTokens, transactions, users } from "@okes/db";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db";
-import { startOfMonth } from "./http";
+import { periodStart } from "./http";
 
 type PushKind = "caps" | "approvals" | "summary" | "crew";
 type Payload = { title: string; body: string; data?: Record<string, unknown> };
@@ -50,7 +50,8 @@ export async function notifyCapCrossing(userId: string, categoryId: string | nul
         eq(transactions.userId, userId),
         eq(transactions.categoryId, categoryId),
         eq(transactions.direction, "out"),
-        gte(transactions.occurredAt, startOfMonth()),
+        eq(transactions.paid, true),
+        gte(transactions.occurredAt, periodStart(cap.period)),
       ),
     );
   const now = Number(row?.spent ?? 0);

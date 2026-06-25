@@ -22,3 +22,14 @@ export const currencyField = z.string().length(3).default("GHS");
 export function startOfMonth(d = new Date()): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
+
+/** Start of the current period window for a budget. Week starts Monday. */
+export function periodStart(period: string, d = new Date()): Date {
+  if (period === "daily") return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (period === "weekly") {
+    const day = (d.getDay() + 6) % 7; // Mon=0
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    return start;
+  }
+  return startOfMonth(d);
+}

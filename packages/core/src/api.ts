@@ -105,6 +105,7 @@ export interface CapDto {
   spentMinor: number;
   status: "on_track" | "near" | "over";
   currency: string;
+  period: "daily" | "weekly" | "monthly";
 }
 export interface ProfileDto {
   name: string;
@@ -191,6 +192,7 @@ export interface NewCapInput {
   categoryId: string;
   limitMinor: number;
   currency?: string;
+  period?: "daily" | "weekly" | "monthly";
   alertThresholds?: number[];
   lockAtLimit?: boolean;
   notifyCrew?: boolean;

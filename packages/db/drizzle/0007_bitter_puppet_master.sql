@@ -1,0 +1,1 @@
+ALTER TABLE "caps" ADD COLUMN "period" varchar(16) DEFAULT 'monthly' NOT NULL;
