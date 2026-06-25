@@ -7,7 +7,7 @@ import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
-import { KenteRow, ProgressRing } from "../../components/Decor";
+import { ProgressRing } from "../../components/Decor";
 import { ChipSelect, Field, SheetButton, Toggle, toMinor } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
 import { Icon, Pill, ProgressBar, SectionHeader } from "../../components/primitives";
@@ -131,7 +131,6 @@ export default function CommandCenter() {
           {/* Header */}
           <View style={styles.header}>
             <View style={{ gap: 5 }}>
-              <KenteRow colors={[colors.accentAmber, colors.accentCyan, colors.accentPink, colors.accentViolet]} />
               <Text style={[styles.eyebrow, { color: colors.accentCyan }]}>MISSION DAY 128</Text>
               <Text style={[styles.greeting, { color: colors.textPrimary }]}>Good morning, {firstName}</Text>
             </View>
