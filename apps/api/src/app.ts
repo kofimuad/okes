@@ -7,6 +7,7 @@ import { approvalRoutes } from "./routes/approvals";
 import { authRoutes } from "./routes/auth";
 import { capRoutes } from "./routes/caps";
 import { categoryRoutes } from "./routes/categories";
+import { coachRoutes } from "./routes/coach";
 import { crewRoutes } from "./routes/crew";
 import { deviceRoutes } from "./routes/devices";
 import { goalRoutes } from "./routes/goals";
@@ -57,6 +58,7 @@ export async function buildApp() {
   // Dashboard
   await app.register(summaryRoutes);
   await app.register(analyticsRoutes);
+  await app.register(coachRoutes);
 
   return app;
 }

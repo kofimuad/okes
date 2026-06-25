@@ -6,6 +6,11 @@ const schema = z.object({
   PORT: z.coerce.number().default(8080),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 chars"),
+  // NOVA AI coach. provider: "anthropic" (default) or "openai" (xAI Grok, OpenRouter, etc.)
+  COACH_PROVIDER: z.enum(["anthropic", "openai"]).default("anthropic"),
+  COACH_MODEL: z.string().default("claude-sonnet-4-6"),
+  COACH_API_KEY: z.string().optional(),
+  COACH_BASE_URL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

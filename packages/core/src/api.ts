@@ -256,6 +256,7 @@ export interface ApiClient {
   listApprovals(): Promise<{ approvals: ApprovalDto[] }>;
   getProfile(): Promise<{ profile: ProfileDto }>;
   getAnalytics(months?: number): Promise<AnalyticsDto>;
+  coachChat(messages: { role: "user" | "assistant"; content: string }[]): Promise<{ reply: string }>;
   listMissions(): Promise<{ missions: MissionDto[] }>;
   claimMission(key: string): Promise<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>;
   registerDevice(token: string, platform?: string): Promise<{ ok: true }>;
@@ -389,6 +390,7 @@ export function createApiClient(baseUrl: string): ApiClient {
     listApprovals: () => request<{ approvals: ApprovalDto[] }>("/approvals"),
     getProfile: () => request<{ profile: ProfileDto }>("/profile"),
     getAnalytics: (months) => request<AnalyticsDto>(`/analytics${months ? `?months=${months}` : ""}`),
+    coachChat: (messages) => request<{ reply: string }>("/coach/chat", { method: "POST", body: { messages } }),
     listMissions: () => request<{ missions: MissionDto[] }>("/missions"),
     claimMission: (key) =>
       request<{ profile: ProfileDto; missions: MissionDto[]; awardedXp: number }>(`/missions/${key}/claim`, { method: "POST" }),

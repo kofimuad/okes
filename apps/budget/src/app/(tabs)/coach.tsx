@@ -1,135 +1,206 @@
+import { formatMoney, money } from "@okes/core";
 import { fonts, radius } from "@okes/ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, Pill } from "../../components/primitives";
+import { Icon } from "../../components/primitives";
 import { ScreenBackground } from "../../components/ScreenBackground";
+import { api } from "../../lib/api";
 import { useTheme } from "../../theme";
 
-const PLAN_STEPS = [
-  "Set aside GHS 570 every week",
-  "Trim Food cap by GHS 150/mo (+450)",
-  "Auto-route side-hustle income to Vault",
-];
+type Action =
+  | { type: "create_goal"; name: string; targetMinor: number; deadline?: string | null }
+  | { type: "create_cap"; category: string; limitMinor: number; period?: "daily" | "weekly" | "monthly" };
+type Msg = { id: string; role: "user" | "assistant"; text: string; action?: Action; done?: boolean };
+
 const SUGGESTIONS = [
-  { icon: "payments", label: "Cut spending" },
-  { icon: "event", label: "Plan payday" },
-  { icon: "rocket-launch", label: "Save faster" },
+  { icon: "savings", label: "Save more", prompt: "How can I save more this month?" },
+  { icon: "trending-down", label: "Overspending?", prompt: "Am I overspending anywhere?" },
+  { icon: "flag", label: "Set a goal", prompt: "Help me set a realistic savings goal." },
 ] as const;
+
+let counter = 0;
+const uid = () => `m${Date.now()}_${counter++}`;
+
+function parseAction(text: string): { display: string; action?: Action } {
+  const m = text.match(/```okes-action\s*([\s\S]*?)```/);
+  if (!m) return { display: text };
+  let action: Action | undefined;
+  try { action = JSON.parse(m[1]!.trim()); } catch { /* ignore malformed */ }
+  return { display: text.replace(m[0], "").trim(), action };
+}
 
 export default function CoachScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const qc = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const catsQ = useQuery({ queryKey: ["categories"], queryFn: () => api.listCategories() });
+
+  const [messages, setMessages] = useState<Msg[]>([
+    { id: uid(), role: "assistant", text: "Hi, I'm NOVA 👋 I can see your live balances, spending, caps and goals. Ask me how to save, where you're overspending, or to set up a goal." },
+  ]);
+  const [input, setInput] = useState("");
+
+  const chat = useMutation({
+    mutationFn: (history: Msg[]) => api.coachChat(history.map((m) => ({ role: m.role, content: m.text }))),
+    onSuccess: (data) => {
+      const { display, action } = parseAction(data.reply);
+      setMessages((m) => [...m, { id: uid(), role: "assistant", text: display || "…", action }]);
+    },
+    onError: (e) => setMessages((m) => [...m, { id: uid(), role: "assistant", text: e instanceof Error ? `⚠️ ${e.message}` : "⚠️ NOVA is unavailable right now." }]),
+  });
+
+  const send = (text: string) => {
+    const t = text.trim();
+    if (!t || chat.isPending) return;
+    setInput("");
+    setMessages((m) => {
+      const next = [...m, { id: uid(), role: "user" as const, text: t }];
+      chat.mutate(next);
+      return next;
+    });
+  };
+
+  const act = useMutation({
+    mutationFn: async ({ action }: { id: string; action: Action }) => {
+      if (action.type === "create_goal") {
+        await api.createGoal({ name: action.name, icon: "savings", targetMinor: action.targetMinor, deadline: action.deadline || undefined });
+      } else {
+        const cat = (catsQ.data?.categories ?? []).find((c) => c.name.toLowerCase() === action.category.toLowerCase());
+        if (!cat) throw new Error(`No category named "${action.category}". Create it under Categories first.`);
+        await api.createCap({ categoryId: cat.id, limitMinor: action.limitMinor, period: action.period ?? "monthly" });
+      }
+    },
+    onSuccess: (_d, { id, action }) => {
+      for (const k of ["goals", "caps", "summary"]) qc.invalidateQueries({ queryKey: [k] });
+      setMessages((m) => [
+        ...m.map((x) => (x.id === id ? { ...x, done: true } : x)),
+        { id: uid(), role: "assistant", text: action.type === "create_goal" ? "Done — your goal is set. I'll keep an eye on it. 🚀" : "Done — that cap is live. I'll alert you as you approach it." },
+      ]);
+    },
+    onError: (e) => Alert.alert("Couldn't do that", e instanceof Error ? e.message : "Try again."),
+  });
 
   return (
     <ScreenBackground>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-        <View style={{ flex: 1, paddingHorizontal: 20 }}>
-          {/* Top bar */}
-          <View style={styles.topBar}>
-            <Pressable onPress={() => router.push("/")} style={[styles.circle, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
-              <Icon name="chevron-left" size={24} color={colors.textPrimary} />
-            </Pressable>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>NOVA Coach</Text>
-            <View style={[styles.circle, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
-              <Icon name="history" size={22} color={colors.textSecondary} />
-            </View>
-          </View>
-
-          {/* Companion orb */}
-          <View style={styles.orbWrap}>
-            <View style={[styles.ring1, { backgroundColor: colors.tintTeal }]}>
-              <View style={[styles.ring2, { backgroundColor: colors.tintViolet }]}>
-                <View style={[styles.core, { backgroundColor: colors.surfaceGlassStrong, borderColor: colors.hairlineBright }]}>
-                  <Icon name="smart-toy" size={30} color={colors.accentCyan} />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <View style={{ flex: 1, paddingHorizontal: 20 }}>
+            <View style={styles.topBar}>
+              <Pressable onPress={() => router.push("/")} style={[styles.circle, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+                <Icon name="chevron-left" size={24} color={colors.textPrimary} />
+              </Pressable>
+              <View style={[styles.orb, { backgroundColor: colors.tintTeal, borderColor: colors.hairlineBright }]}>
+                <Icon name="smart-toy" size={20} color={colors.accentCyan} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.title, { color: colors.textPrimary }]}>NOVA</Text>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: colors.accentMint }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>reads your live data</Text>
                 </View>
               </View>
             </View>
-            <View style={styles.status}>
-              <View style={[styles.dot, { backgroundColor: colors.accentMint }]} />
-              <Text style={[styles.statusText, { color: colors.textSecondary }]}>Online · reads your live data</Text>
-            </View>
-          </View>
 
-          {/* Chat thread */}
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
-            <Bubble side="ai">Morning, Kwame 👋 Your runway is 42 days — solid. But Food & Dining is at 88% with 9 days left in this cycle.</Bubble>
-            <Bubble side="user">How do I save for the MacBook by December?</Bubble>
-
-            {/* AI plan card */}
-            <View style={styles.aiRow}>
-              <View style={[styles.planCard, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairlineBright }]}>
-                <View style={styles.planHead}>
-                  <View style={[styles.planIcon, { backgroundColor: colors.tintTeal }]}>
-                    <Icon name="flag" size={16} color={colors.accentCyan} />
-                  </View>
-                  <Text style={[styles.planTitle, { color: colors.textPrimary }]}>Your MacBook plan</Text>
-                </View>
-                <Text style={[styles.planIntro, { color: colors.textSecondary }]}>Here's how you reach GHS 9,000 by Dec 12:</Text>
-                {PLAN_STEPS.map((s, i) => (
-                  <View key={s} style={styles.step}>
-                    <View style={[styles.stepNum, { backgroundColor: colors.tintTeal }]}>
-                      <Text style={[styles.stepNumText, { color: colors.accentCyan }]}>{i + 1}</Text>
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: 12, paddingVertical: 12 }}
+              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            >
+              {messages.map((m) => (
+                <View key={m.id} style={{ gap: 8 }}>
+                  <View style={[styles.bubbleRow, { justifyContent: m.role === "assistant" ? "flex-start" : "flex-end" }]}>
+                    <View
+                      style={[
+                        styles.bubble,
+                        m.role === "assistant"
+                          ? { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline, borderBottomLeftRadius: 4 }
+                          : { backgroundColor: colors.tintTealStrong, borderColor: colors.hairlineBright, borderBottomRightRadius: 4 },
+                      ]}
+                    >
+                      <Text style={[styles.bubbleText, { color: colors.textPrimary }]}>{m.text}</Text>
                     </View>
-                    <Text style={[styles.stepText, { color: colors.textPrimary }]}>{s}</Text>
                   </View>
-                ))}
-                <View style={styles.planFoot}>
-                  <Pill bg={colors.tintGreen}>
-                    <Icon name="check-circle" size={13} color={colors.accentMint} />
-                    <Text style={[styles.footText, { color: colors.accentMint }]}>On track · Dec 12</Text>
-                  </Pill>
-                  <Pill bg={colors.tintViolet}>
-                    <Text style={[styles.footText, { color: colors.accentViolet }]}>86% confidence</Text>
-                  </Pill>
+                  {m.action && <ActionCard action={m.action} done={m.done} busy={act.isPending} onConfirm={() => act.mutate({ id: m.id, action: m.action! })} />}
                 </View>
+              ))}
+              {chat.isPending && (
+                <View style={[styles.bubbleRow, { justifyContent: "flex-start" }]}>
+                  <View style={[styles.bubble, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+                    <ActivityIndicator color={colors.accentCyan} />
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            {messages.length <= 1 && (
+              <View style={styles.chips}>
+                {SUGGESTIONS.map((s) => (
+                  <Pressable key={s.label} onPress={() => send(s.prompt)} style={[styles.chip, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+                    <Icon name={s.icon as never} size={15} color={colors.accentCyan} />
+                    <Text style={[styles.chipText, { color: colors.textSecondary }]}>{s.label}</Text>
+                  </Pressable>
+                ))}
               </View>
-            </View>
-          </ScrollView>
+            )}
 
-          {/* Suggestions */}
-          <View style={styles.chips}>
-            {SUGGESTIONS.map((s) => (
-              <Pill key={s.label} bg={colors.surfaceGlass} style={{ paddingVertical: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.hairline }}>
-                <Icon name={s.icon as never} size={15} color={colors.accentCyan} />
-                <Text style={[styles.chipText, { color: colors.textSecondary }]}>{s.label}</Text>
-              </Pill>
-            ))}
-          </View>
-
-          {/* Input bar */}
-          <View style={[styles.inputBar, { paddingBottom: insets.bottom + 84 }]}>
-            <View style={[styles.field, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
-              <Text style={[styles.placeholder, { color: colors.textMuted }]}>Ask NOVA anything…</Text>
-              <Icon name="mic" size={20} color={colors.textSecondary} />
-            </View>
-            <View style={[styles.send, { backgroundColor: colors.accentCyan }]}>
-              <Icon name="send" size={22} color={colors.onAccent} />
+            <View style={[styles.inputBar, { paddingBottom: insets.bottom + 90 }]}>
+              <View style={[styles.field, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
+                <TextInput
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="Ask NOVA anything…"
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.fieldInput, { color: colors.textPrimary }]}
+                  onSubmitEditing={() => send(input)}
+                  returnKeyType="send"
+                />
+              </View>
+              <Pressable onPress={() => send(input)} disabled={!input.trim() || chat.isPending} style={[styles.send, { backgroundColor: colors.accentCyan, opacity: !input.trim() || chat.isPending ? 0.5 : 1 }]}>
+                <Icon name="send" size={22} color={colors.onAccent} />
+              </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ScreenBackground>
   );
 }
 
-function Bubble({ side, children }: { side: "ai" | "user"; children: ReactNode }) {
+function ActionCard({ action, done, busy, onConfirm }: { action: Action; done?: boolean; busy: boolean; onConfirm: () => void }) {
   const { colors } = useTheme();
-  const ai = side === "ai";
+  const isGoal = action.type === "create_goal";
+  const title = action.type === "create_goal" ? `New goal: ${action.name}` : `New cap: ${action.category}`;
+  const sub =
+    action.type === "create_goal"
+      ? `Target ${formatMoney(money(action.targetMinor))}${action.deadline ? ` by ${action.deadline}` : ""}`
+      : `${formatMoney(money(action.limitMinor))} / ${action.period ?? "monthly"}`;
   return (
-    <View style={[styles.bubbleRow, { justifyContent: ai ? "flex-start" : "flex-end" }]}>
-      <View
-        style={[
-          styles.bubble,
-          ai
-            ? { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline, borderBottomLeftRadius: 4 }
-            : { backgroundColor: colors.tintTealStrong, borderColor: colors.hairlineBright, borderBottomRightRadius: 4 },
-        ]}
-      >
-        <Text style={[styles.bubbleText, { color: colors.textPrimary }]}>{children}</Text>
+    <View style={[styles.actionCard, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairlineBright }]}>
+      <View style={[styles.actionIcon, { backgroundColor: colors.tintTeal }]}>
+        <Icon name={isGoal ? "flag" : "speed"} size={18} color={colors.accentCyan} />
       </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        <Text style={[styles.actionSub, { color: colors.textSecondary }]}>{sub}</Text>
+      </View>
+      {done ? (
+        <View style={styles.doneRow}>
+          <Icon name="check-circle" size={18} color={colors.accentMint} />
+          <Text style={[styles.doneText, { color: colors.accentMint }]}>Done</Text>
+        </View>
+      ) : (
+        <Pressable onPress={onConfirm} disabled={busy} style={[styles.confirm, { backgroundColor: colors.accentCyan }]}>
+          {busy ? <ActivityIndicator color={colors.onAccent} /> : <Text style={[styles.confirmText, { color: colors.onAccent }]}>Confirm</Text>}
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -137,33 +208,27 @@ function Bubble({ side, children }: { side: "ai" | "user"; children: ReactNode }
 const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 2 },
   circle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  title: { flex: 1, fontFamily: fonts.display, fontSize: 20 },
-  orbWrap: { alignItems: "center", gap: 10, paddingVertical: 14 },
-  ring1: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-  ring2: { width: 78, height: 78, borderRadius: 39, alignItems: "center", justifyContent: "center" },
-  core: { width: 60, height: 60, borderRadius: 30, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  status: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontFamily: fonts.body, fontSize: 12 },
+  orb: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  title: { fontFamily: fonts.display, fontSize: 18 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontFamily: fonts.body, fontSize: 11 },
   bubbleRow: { flexDirection: "row" },
-  bubble: { maxWidth: 290, borderWidth: 1, borderRadius: 18, padding: 14 },
+  bubble: { maxWidth: 300, borderWidth: 1, borderRadius: 18, padding: 14 },
   bubbleText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
-  aiRow: { flexDirection: "row", justifyContent: "flex-start" },
-  planCard: { width: 300, borderWidth: 1, borderRadius: 18, borderBottomLeftRadius: 4, padding: 16, gap: 12 },
-  planHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  planIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  planTitle: { fontFamily: fonts.display, fontSize: 14 },
-  planIntro: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19 },
-  step: { flexDirection: "row", alignItems: "center", gap: 10 },
-  stepNum: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  stepNumText: { fontFamily: fonts.displayBold, fontSize: 12 },
-  stepText: { flex: 1, fontFamily: fonts.body, fontSize: 13 },
-  planFoot: { flexDirection: "row", gap: 8, alignItems: "center", paddingTop: 2 },
-  footText: { fontFamily: fonts.semibold, fontSize: 11 },
-  chips: { flexDirection: "row", gap: 8, paddingVertical: 12, justifyContent: "center" },
+  actionCard: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 16, padding: 12, maxWidth: 320 },
+  actionIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  actionTitle: { fontFamily: fonts.semibold, fontSize: 14 },
+  actionSub: { fontFamily: fonts.body, fontSize: 12 },
+  confirm: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: radius.pill },
+  confirmText: { fontFamily: fonts.bold, fontSize: 13 },
+  doneRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  doneText: { fontFamily: fonts.semibold, fontSize: 12 },
+  chips: { flexDirection: "row", gap: 8, paddingVertical: 10, justifyContent: "center" },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 9, paddingHorizontal: 13, borderRadius: radius.pill, borderWidth: 1 },
   chipText: { fontFamily: fonts.medium, fontSize: 12 },
   inputBar: { flexDirection: "row", gap: 10, alignItems: "center" },
-  field: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 13, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1 },
-  placeholder: { fontFamily: fonts.body, fontSize: 14 },
+  field: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, height: 48, borderRadius: radius.pill, borderWidth: 1 },
+  fieldInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, paddingVertical: 0 },
   send: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
 });
