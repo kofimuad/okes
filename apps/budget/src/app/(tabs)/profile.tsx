@@ -1,7 +1,7 @@
 import { fonts, radius } from "@okes/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, type Href } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { GlassCard } from "../../components/GlassCard";
@@ -16,6 +16,7 @@ const SETTINGS: { icon: string; label: string; route: Href }[] = [
   { icon: "category", label: "Categories", route: "/categories" },
   { icon: "account-balance-wallet", label: "Linked wallets", route: "/wallets" },
   { icon: "payments", label: "Currency", route: "/settings/currency" },
+  { icon: "ios-share", label: "Export data", route: "/settings/export" },
   { icon: "help", label: "Help & support", route: "/settings/help" },
 ];
 
@@ -106,6 +107,13 @@ export default function ProfileScreen() {
                 <Icon name="chevron-right" size={20} color={colors.textMuted} />
               </Pressable>
             ))}
+            <Pressable style={styles.settingRow} onPress={() => Linking.openURL("market://details?id=com.okes.app").catch(() => Linking.openURL("https://play.google.com/store/apps/details?id=com.okes.app"))}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.surfaceGlassStrong }]}>
+                <Icon name="star-rate" size={19} color={colors.accentAmber} />
+              </View>
+              <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Rate Okes</Text>
+              <Icon name="chevron-right" size={20} color={colors.textMuted} />
+            </Pressable>
             <Pressable style={styles.settingRow} onPress={() => logout()}>
               <View style={[styles.settingIcon, { backgroundColor: colors.tintClay }]}>
                 <Icon name="logout" size={19} color={colors.accentPink} />

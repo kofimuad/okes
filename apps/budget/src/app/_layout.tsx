@@ -18,6 +18,7 @@ import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../auth/AuthContext";
+import { LockGate } from "../components/LockGate";
 import { ThemeProvider, useTheme } from "../theme";
 
 const queryClient = new QueryClient({
@@ -81,14 +82,16 @@ function RootInner() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StatusBar style={mode === "dark" ? "light" : "dark"} />
-            <Guard>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bgDeep },
-                }}
-              />
-            </Guard>
+            <LockGate>
+              <Guard>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bgDeep },
+                  }}
+                />
+              </Guard>
+            </LockGate>
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

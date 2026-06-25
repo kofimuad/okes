@@ -41,7 +41,9 @@
       ],
       "expo-secure-store",
       "expo-notifications",
-      "./plugins/withSmsPermissions"
+      "./plugins/withSmsPermissions",
+      "expo-sharing",
+      "expo-local-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
