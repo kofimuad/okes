@@ -1,7 +1,7 @@
 import { fonts, radius } from "@okes/ui";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -13,7 +13,20 @@ import {
 import { useTheme } from "../theme";
 import { Icon } from "./primitives";
 
-/** Bottom-sheet modal with a frosted panel. */
+/** Tracks the on-screen keyboard height (works inside Modals, unlike adjustResize). */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvt, (e) => setHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvt, () => setHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  return height;
+}
+
+/** Bottom-sheet modal with a frosted panel that lifts above the keyboard. */
 export function Sheet({
   visible,
   onClose,
@@ -26,14 +39,11 @@ export function Sheet({
   children: ReactNode;
 }) {
   const { colors } = useTheme();
+  const kb = useKeyboardHeight();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.anchor}
-        pointerEvents="box-none"
-      >
+      <View style={[styles.anchor, { paddingBottom: kb }]} pointerEvents="box-none">
         <View style={[styles.panel, { backgroundColor: colors.surfaceRaised, borderColor: colors.hairline }]}>
           <View style={[styles.handle, { backgroundColor: colors.hairlineBright }]} />
           <View style={styles.header}>
@@ -42,11 +52,11 @@ export function Sheet({
               <Icon name="close" size={22} color={colors.textMuted} />
             </Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+          <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.body}>
             {children}
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -66,5 +76,5 @@ const styles = StyleSheet.create({
   handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 12 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   title: { fontFamily: fonts.displayBold, fontSize: 18, fontWeight: "700" },
-  body: { gap: 14, paddingTop: 6 },
+  body: { gap: 14, paddingTop: 6, paddingBottom: 8 },
 });

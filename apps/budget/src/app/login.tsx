@@ -72,7 +72,7 @@ export default function LoginScreen() {
           <Icon name={themeMode === "dark" ? "light-mode" : "dark-mode"} size={20} color={colors.textSecondary} />
         </Pressable>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.center}
         >
           <View style={styles.brand}>

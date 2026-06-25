@@ -2,7 +2,7 @@ import { fonts } from "@okes/ui";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Field, SheetButton, Toggle } from "../../components/forms";
 import { GlassCard } from "../../components/GlassCard";
@@ -70,7 +70,8 @@ export default function SecurityScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
           <View style={styles.topBar}>
             <Pressable onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: colors.surfaceGlass, borderColor: colors.hairline }]}>
               <Icon name="chevron-left" size={24} color={colors.textPrimary} />
@@ -98,6 +99,7 @@ export default function SecurityScreen() {
             )}
           </GlassCard>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
 
       <Sheet visible={pinSheet} onClose={() => { setPinSheet(false); setFirstPin(null); }} title={firstPin === null ? "Set a passcode" : "Confirm passcode"}>
